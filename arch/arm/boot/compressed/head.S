@@ -140,6 +140,16 @@ start:
 #ifdef CONFIG_ARM_VIRT_EXT
 		bl	__hyp_stub_install	@ get into SVC mode, reversibly
 #endif
+
+/* HACK ADDED BY DOUG TO DISABLE L2 CACHE EARLY IN BOOT PROCESS */
+#ifdef CONFIG_CPU_PXA168
+		mcr	p15, 1, r7, c7, c11, 0 @L2 Cache Clean All
+		mrc	p15, 0, r7, c1, c0, 0
+		bic	r7, r7, #(1 << 26)
+		mcr	p15, 0, r7, c1, c0, 0  @Disable L2 Cache
+#endif
+/* END HACK ADDED BY DOUG */
+
 		mov	r7, r1			@ save architecture ID
 		mov	r8, r2			@ save atags pointer
 
