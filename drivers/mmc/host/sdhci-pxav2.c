@@ -30,6 +30,7 @@
 #include <linux/slab.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
+#include <linux/delay.h>
 
 #include "sdhci.h"
 #include "sdhci-pltfm.h"
@@ -75,7 +76,12 @@ static void pxav2_set_private_registers(struct sdhci_host *host, u8 mask)
 			writew(tmp, host->ioaddr + SD_CLOCK_BURST_SIZE_SETUP);
 		}
 
-		if (pdata && (pdata->flags & PXA_FLAG_ENABLE_CLOCK_GATING)) {
+		if (pdata && pdata->pxav1_controller) {
+			/* no clock gating */
+			tmp = readw(host->ioaddr + SD_FIFO_PARAM);
+			tmp |= DIS_PAD_SD_CLK_GATE;
+			writew(tmp, host->ioaddr + SD_FIFO_PARAM);
+		} else if (pdata && (pdata->flags & PXA_FLAG_ENABLE_CLOCK_GATING)) {
 			tmp = readw(host->ioaddr + SD_FIFO_PARAM);
 			tmp &= ~CLK_GATE_SETTING_BITS;
 			writew(tmp, host->ioaddr + SD_FIFO_PARAM);
@@ -111,10 +117,40 @@ static int pxav2_mmc_set_width(struct sdhci_host *host, int width)
 	return 0;
 }
 
+/*
+ * Remap version register so that we don't crash and burn
+ */
+static inline u16 pxa168_readw(struct sdhci_host *host, int reg)
+{
+	u32 temp;
+	if (reg == SDHCI_HOST_VERSION) {
+		temp = readl (host->ioaddr + SDHCI_HOST_VERSION - 2) >> 16;
+		return temp & 0xffff;
+	}
+
+	return readw(host->ioaddr + reg);
+}
+
+/*
+ * we cannot talk to controller for 8 bus cycles according to sdio spec
+ * at lowest speed this is 100,000 HZ per cycle or 800,000 cycles
+ * which is quite a LONG TIME on a fast cpu -- so delay if needed
+ */
+static void platform_specific_completion(struct sdhci_host *host)
+{
+	struct platform_device *pdev = to_platform_device(mmc_dev(host->mmc));
+	struct sdhci_pxa_platdata *pdata = pdev->dev.platform_data;
+
+	if (host->clock < 3200000 && pdata && pdata->delay_in_ms)
+		mdelay(pdata->delay_in_ms);
+}
+
 static const struct sdhci_ops pxav2_sdhci_ops = {
+	.read_w = &pxa168_readw,
 	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
 	.platform_reset_exit = pxav2_set_private_registers,
 	.platform_bus_width = pxav2_mmc_set_width,
+	.platform_specific_completion = platform_specific_completion,
 };
 
 #ifdef CONFIG_OF

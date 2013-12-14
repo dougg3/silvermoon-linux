@@ -1013,6 +1013,9 @@ void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
 		mdelay(1);
 	}
 
+	if (host->ops->platform_specific_completion)
+		host->ops->platform_specific_completion(host);
+
 	mod_timer(&host->timer, jiffies + 10 * HZ);
 
 	host->cmd = cmd;
@@ -1174,19 +1177,30 @@ static void sdhci_set_clock(struct sdhci_host *host, unsigned int clock)
 		 * Mode.
 		 */
 		if (host->clk_mul) {
-			for (div = 1; div <= 1024; div++) {
-				if ((host->max_clk * host->clk_mul / div)
-					<= clock)
-					break;
-			}
+			u16 ctrl;
+
 			/*
-			 * Set Programmable Clock Mode in the Clock
-			 * Control register.
+			 * We need to figure out whether the Host Driver needs
+			 * to select Programmable Clock Mode, or the value can
+			 * be set automatically by the Host Controller based on
+			 * the Preset Value registers.
 			 */
-			clk = SDHCI_PROG_CLOCK_MODE;
-			real_div = div;
-			clk_mul = host->clk_mul;
-			div--;
+			ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+			if (!(ctrl & SDHCI_CTRL_PRESET_VAL_ENABLE)) {
+				for (div = 1; div <= 1024; div++) {
+					if ((host->max_clk * host->clk_mul / div)
+						<= clock)
+						break;
+				}
+				/*
+				 * Set Programmable Clock Mode in the Clock
+				 * Control register.
+				 */
+				clk = SDHCI_PROG_CLOCK_MODE;
+				real_div = div;
+				clk_mul = host->clk_mul;
+				div--;
+			}
 		} else {
 			/* Version 3.00 divisors must be a multiple of 2. */
 			if (host->max_clk <= clock)

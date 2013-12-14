@@ -40,6 +40,8 @@
  * @quirks: quirks of platfrom
  * @quirks2: quirks2 of platfrom
  * @pm_caps: pm_caps of platfrom
+ * @pxav1_controller: set if pxa168
+ * @delay_in_ms: delay for pxa168 after commands
  */
 struct sdhci_pxa_platdata {
 	unsigned int	flags;
@@ -54,6 +56,8 @@ struct sdhci_pxa_platdata {
 	unsigned int	quirks;
 	unsigned int	quirks2;
 	unsigned int	pm_caps;
+	bool		pxav1_controller;
+	unsigned int	delay_in_ms;
 };
 
 struct sdhci_pxa {
