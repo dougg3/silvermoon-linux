@@ -633,6 +633,177 @@ static void serial_pxa_console_putchar(struct uart_port *port, int ch)
 	serial_out(up, UART_TX, ch);
 }
 
+#ifdef CONFIG_MACH_ASPENITE
+
+#include <asm/system_misc.h>
+
+#define CHLOG(format, arg...)            \
+	printk("serial/pxa.c - %s():%d - " format, __func__, __LINE__, ## arg)
+
+static char pxa_getc(struct uart_pxa_port *up)
+{
+	int counter = 0;
+	char c;
+	while(counter++<10 && !serial_in(up, 0x24 /*UART_FOR*/))
+		udelay(1);
+	c = serial_in(up, 0);
+	serial_out(up, 0x24, 0); // Acknowledge we got the byte
+	return c;
+}
+
+static void send_cp_command(struct uart_pxa_port *up, char *cmd,
+							char *arg, char *response) {
+	int ier, fcr;
+	int j, i, q_found;
+	char c=0;
+
+	clk_enable(up->clk);
+
+    /*
+     *  First save the IER then disable the interrupts
+     */
+    ier = serial_in(up, UART_IER);
+    serial_out(up, UART_IER, UART_IER_UUE);
+
+	/*
+	 * Disable FIFOs and set to 8-bits
+	 */
+	fcr = serial_in(up, UART_FCR);
+	serial_out(up, UART_FCR, 0);
+
+
+	/* Send out four '!' symbols and wait for a response */
+	q_found = 0;
+	for(j=0; j<4 && !q_found; j++) {
+		serial_out(up, UART_TX, '!');
+		serial_out(up, UART_TX, '!');
+		serial_out(up, UART_TX, '!');
+		serial_out(up, UART_TX, '!');
+		for(i=0; i<10 && !q_found; i++) {
+			if((c=pxa_getc(up))=='?') {
+				q_found = 1;
+				break;
+			}
+			udelay(300);
+		}
+	}
+	if(!q_found)
+		CHLOG("Waited more than 2 msecs, and still got %02x\n", c);
+
+	while(*cmd) {
+		wait_for_xmitr(up);
+		udelay(1000);
+		serial_out(up, UART_TX, *cmd++);
+	}
+	if(arg) {
+		while(*arg) {
+			wait_for_xmitr(up);
+			udelay(1000);
+			serial_out(up, UART_TX, *arg++);
+		}
+	}
+	wait_for_xmitr(up);
+	udelay(1000);
+	serial_out(up, UART_TX, '\n');
+	wait_for_xmitr(up);
+	udelay(1000);
+	serial_out(up, UART_TX, '\r');
+
+
+	if(response) {
+		while(*response) {
+			char c;
+			mdelay(1);
+			c = pxa_getc(up);
+			if(*response != c) {
+				CHLOG("Invalid response.  Wanted 0x%02x, but got 0x%02x\n",
+						*response, c);
+				goto err_out;
+			}
+			response++;
+		}
+	}
+
+err_out:
+    wait_for_xmitr(up);
+	/*
+	 * Re-enable FIFOs, if they were enabled before.
+	 */
+	serial_out(up, UART_FCR, fcr);
+
+
+    /*
+     *  Finally, wait for transmitter to become empty
+     *  and restore the IER
+     */
+    serial_out(up, UART_IER, ier);
+
+	clk_disable(up->clk);
+}
+
+static void silvermoon_pm_power_off(void)
+{
+	struct uart_pxa_port *up = serial_pxa_ports[2];
+
+    CHLOG("Powering off...\n");
+    // Have the CP power us down.
+    if(!up) {
+        CHLOG("serial_pxa_ports is NULL.  Try to power off too soon?\n");
+        return;
+    }
+
+	/*
+	 * Due to timing reasons and lack of flow-control, the first try might
+	 * not bring the system down.  Try multiple times.
+	 */
+	send_cp_command(up, "DOWN", NULL, NULL);
+	send_cp_command(up, "DOWN", NULL, NULL);
+	send_cp_command(up, "DOWN", NULL, NULL);
+	send_cp_command(up, "DOWN", NULL, NULL);
+	send_cp_command(up, "DOWN", NULL, NULL);
+	send_cp_command(up, "DOWN", NULL, NULL);
+	send_cp_command(up, "DOWN", NULL, NULL);
+	send_cp_command(up, "DOWN", NULL, NULL);
+
+	CHLOG("We should be powered down now.\n");
+}
+
+static void silvermoon_pm_restart(enum reboot_mode reboot_mode, const char *cmd)
+{
+	struct uart_pxa_port *up = serial_pxa_ports[2];
+
+    CHLOG("Rebooting...\n");
+
+    if(!up) {
+        CHLOG("serial_pxa_ports is NULL.  Try to reboot too soon?\n");
+        return;
+    }
+
+	/*
+	 * The lack of flow control means that bytes may get lost, so try
+	 * several times to reset.
+	 * Also note that this RSET method requires a patched board that adds a
+	 * pulldown to the serial line.
+	 */
+	send_cp_command(up, "RSET", NULL, NULL);
+	send_cp_command(up, "RSET", NULL, NULL);
+	send_cp_command(up, "RSET", NULL, NULL);
+	send_cp_command(up, "RSET", NULL, NULL);
+	send_cp_command(up, "RSET", NULL, NULL);
+	send_cp_command(up, "RSET", NULL, NULL);
+	send_cp_command(up, "RSET", NULL, NULL);
+	send_cp_command(up, "RSET", NULL, NULL);
+
+	/*
+	send_cp_command(up, "ALRM", "AQAAAA==", "ASET");
+	send_cp_command(up, "DOWN", NULL, NULL);
+	*/
+
+    CHLOG("Shouldn't get here.\n");
+}
+
+#endif
+
 /*
  * Print a string to the serial port trying not to disturb
  * any possible real use of the port...
@@ -905,6 +1076,15 @@ static int serial_pxa_probe(struct platform_device *dev)
 
 	uart_add_one_port(&serial_pxa_reg, &sport->port);
 	platform_set_drvdata(dev, sport);
+
+#ifdef CONFIG_MACH_ASPENITE
+	if(dev->id == 2) {
+		// Overwrite the default reboot and shutdown commands to use our
+		// cryptoprocessor-enabled versions.
+		arm_pm_restart = silvermoon_pm_restart;
+		pm_power_off   = silvermoon_pm_power_off;
+	}
+#endif
 
 	return 0;
 
