@@ -110,6 +110,10 @@ PXA168_DEVICE(ssp5, "pxa168-ssp", 4, SSP5, 0xd4021000, 0x40, 60, 61);
 PXA168_DEVICE(fb, "pxa168-fb", -1, LCD, 0xd420b000, 0x1c8);
 PXA168_DEVICE(keypad, "pxa27x-keypad", -1, KEYPAD, 0xd4012000, 0x4c);
 PXA168_DEVICE(eth, "pxa168-eth", -1, MFU, 0xc0800000, 0x0fff);
+PXA168_DEVICE(sdh0, "sdhci-pxav2", 0, SDH1, 0xd4280000, 0x100);
+PXA168_DEVICE(sdh1, "sdhci-pxav2", 1, SDH1, 0xd4281000, 0x100);
+PXA168_DEVICE(sdh2, "sdhci-pxav2", 2, SDH2, 0xd427e000, 0x100);
+PXA168_DEVICE(sdh3, "sdhci-pxav2", 3, SDH2, 0xd427f000, 0x100);
 
 struct resource pxa168_resource_gpio[] = {
 	{
@@ -176,3 +180,104 @@ void pxa168_restart(enum reboot_mode mode, const char *cmd)
 {
 	soft_restart(0xffff0000);
 }
+
+#if 1
+void mfp_set(int mfp, unsigned long mask)
+{
+	unsigned long tmp = mfp_read(mfp);
+
+	tmp |= mask;
+	mfp_write(mfp, tmp);
+}
+
+void mfp_clr(int mfp, unsigned long mask)
+{
+	unsigned long tmp = mfp_read(mfp);
+
+	tmp &= ~mask;
+	mfp_write(mfp, tmp);
+}
+
+void pxa168_mfp_set_fastio_drive(int type)
+{
+	switch (type) {
+	/* pxa168 mfpr drive strength for fast IO pins[56:85]:
+	 * ZR[0] = MFPR57[10] & MFPR59[10]
+	 * ZR[1] = MFPR56[11] & MFPR58[11]
+	 * ZR[2] = MFPR56[10] & MFPR58[10]
+	 */
+	case MFP_DS01X:
+		/* ZR[0] = ZR[1] = 0 */
+		mfp_clr(57, 1<<10);
+		mfp_clr(59, 1<<10);
+		mfp_clr(56, 1<<11);
+		mfp_clr(58, 1<<11);
+		break;
+	case MFP_DS02X:
+		/* ZR[0] = 0, ZR[1] = 1 */
+		mfp_clr(57, 1<<10);
+		mfp_clr(59, 1<<10);
+		mfp_set(56, 1<<11);
+		mfp_set(58, 1<<11);
+		break;
+	case MFP_DS03X:
+		/* ZR[0] = 1, ZR[1] = 0 */
+		mfp_set(57, 1<<10);
+		mfp_set(59, 1<<10);
+		mfp_clr(56, 1<<11);
+		mfp_clr(58, 1<<11);
+		break;
+	case MFP_DS04X:
+		/* ZR[0] = ZR[1] = 1 */
+		mfp_set(57, 1<<10);
+		mfp_set(59, 1<<10);
+		mfp_set(56, 1<<11);
+		mfp_set(58, 1<<11);
+		break;
+	default:
+		pr_err("drv type %d not supported\n", type);
+		break;
+	}
+
+	pr_info("%s config changed to %x\n", __func__, type);
+	return;
+}
+
+#define MFP_VDD_IO_SET(type, pin, bit)			\
+        do {                                            \
+		if (cpu_is_pxa168_S0()) {               \
+			if (type == VDD_IO_3P3V)	\
+				mfp_clr(pin, 1<<(bit));	\
+			else				\
+                                mfp_set(pin, 1<<(bit)); \
+                } else {                                \
+			if (type == VDD_IO_3P3V)	\
+				mfp_set(pin, 1<<(bit));	\
+			else				\
+				mfp_clr(pin, 1<<(bit));	\
+		}					\
+	} while (0);
+
+void pxa168_set_vdd_iox(vdd_io_t vdd_io, int type)
+{
+	switch (vdd_io) {
+	case VDD_IO0:
+		MFP_VDD_IO_SET(type, 60, 10);
+		break;
+	case VDD_IO1:
+		MFP_VDD_IO_SET(type, 60, 11);
+		break;
+	case VDD_IO2:
+		MFP_VDD_IO_SET(type, 61, 10);
+		break;
+	case VDD_IO3:
+		MFP_VDD_IO_SET(type, 61, 11);
+		break;
+	case VDD_IO4:
+		MFP_VDD_IO_SET(type, 62, 11);
+		break;
+	default:
+		pr_err("non-valid VDD_IO %d\n", vdd_io);
+	}
+}
+#endif

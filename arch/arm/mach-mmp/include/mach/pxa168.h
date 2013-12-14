@@ -2,6 +2,7 @@
 #define __ASM_MACH_PXA168_H
 
 #include <linux/reboot.h>
+#include <linux/platform_data/pxa_sdhci.h>
 
 extern void pxa168_timer_init(void);
 extern void __init icu_init_irq(void);
@@ -37,6 +38,10 @@ extern struct pxa_device_desc pxa168_device_nand;
 extern struct pxa_device_desc pxa168_device_fb;
 extern struct pxa_device_desc pxa168_device_keypad;
 extern struct pxa_device_desc pxa168_device_eth;
+extern struct pxa_device_desc pxa168_device_sdh0;
+extern struct pxa_device_desc pxa168_device_sdh1;
+extern struct pxa_device_desc pxa168_device_sdh2;
+extern struct pxa_device_desc pxa168_device_sdh3;
 
 /* pdata can be NULL */
 extern int __init pxa168_add_usb_host(struct mv_usb_platform_data *pdata);
@@ -134,4 +139,36 @@ static inline int pxa168_add_eth(struct pxa168_eth_platform_data *data)
 {
 	return pxa_register_device(&pxa168_device_eth, data, sizeof(*data));
 }
+
+static inline int pxa168_add_sdh(int id, struct sdhci_pxa_platdata *data)
+{
+	struct pxa_device_desc *d = NULL;
+
+	switch (id) {
+	case 0: d = &pxa168_device_sdh0; break;
+	case 1: d = &pxa168_device_sdh1; break;
+	case 2: d = &pxa168_device_sdh2; break;
+	case 3: d = &pxa168_device_sdh3; break;
+	default:
+		return -EINVAL;
+	}
+
+	return pxa_register_device(d, data, sizeof(*data));
+}
+
+#if 1
+#define VDD_IO_3P3V	0
+#define VDD_IO_1P8V	1
+typedef enum {
+	VDD_IO0,
+	VDD_IO1,
+	VDD_IO2,
+	VDD_IO3,
+	VDD_IO4,
+} vdd_io_t;
+
+void pxa168_mfp_set_fastio_drive(int type);
+void pxa168_set_vdd_iox(vdd_io_t vdd_io, int type);
+#endif
+
 #endif /* __ASM_MACH_PXA168_H */
