@@ -162,7 +162,7 @@ static int mv_ehci_probe(struct platform_device *pdev)
 	ehci_mv->pdata = pdata;
 	ehci_mv->hcd = hcd;
 
-	ehci_mv->clk = devm_clk_get(&pdev->dev, NULL);
+	ehci_mv->clk = devm_clk_get(&pdev->dev, "sph_clk");
 	if (IS_ERR(ehci_mv->clk)) {
 		dev_err(&pdev->dev, "error getting clock\n");
 		retval = PTR_ERR(ehci_mv->clk);
