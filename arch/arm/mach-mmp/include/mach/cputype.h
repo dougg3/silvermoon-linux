@@ -2,6 +2,7 @@
 #define __ASM_MACH_CPUTYPE_H
 
 #include <asm/cputype.h>
+#include <mach/addr-map.h>
 
 /*
  *  CPU   Stepping   CPU_ID      CHIP_ID
@@ -27,8 +28,17 @@ static inline int cpu_is_pxa168(void)
 	return (((read_cpuid_id() >> 8) & 0xff) == 0x84) &&
 		((mmp_chip_id & 0xfff) == 0x168);
 }
+static inline int cpu_is_pxa168_S0(void)
+{
+	unsigned int chip_id = __raw_readl((AXI_VIRT_BASE + 0x82c00));
+	if (cpu_is_pxa168() && ((chip_id & 0x0000ffff) == 0x0000c910))
+		return 1;
+	else
+		return 0;
+}
 #else
 #define cpu_is_pxa168()	(0)
+#define cpu_is_pxa168_S0() (0)
 #endif
 
 /* cpu_is_pxa910() is shared on both pxa910 and pxa920 */
