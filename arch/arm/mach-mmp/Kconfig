@@ -84,6 +84,13 @@ config MACH_GPLUGD
 	  Say 'Y' here if you want to support the Marvell PXA168-based
 	  GuruPlug Display (gplugD) Board
 
+config MACH_SILVERMOON
+	bool "Chumby Silvermoon platform"
+	select CPU_PXA168
+	help
+	  Say 'Y' here if you want to support the Chumby Silvermoon
+          platform (Infocast 8 and Chumby 8).
+
 config MACH_MMP_DT
 	bool "Support MMP (ARMv5) platforms from device tree"
 	select CPU_PXA168

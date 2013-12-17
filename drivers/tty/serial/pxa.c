@@ -633,7 +633,7 @@ static void serial_pxa_console_putchar(struct uart_port *port, int ch)
 	serial_out(up, UART_TX, ch);
 }
 
-#ifdef CONFIG_MACH_ASPENITE
+#ifdef CONFIG_MACH_SILVERMOON
 
 #include <asm/system_misc.h>
 
@@ -1077,7 +1077,7 @@ static int serial_pxa_probe(struct platform_device *dev)
 	uart_add_one_port(&serial_pxa_reg, &sport->port);
 	platform_set_drvdata(dev, sport);
 
-#ifdef CONFIG_MACH_ASPENITE
+#ifdef CONFIG_MACH_SILVERMOON
 	if(dev->id == 2) {
 		// Overwrite the default reboot and shutdown commands to use our
 		// cryptoprocessor-enabled versions.
