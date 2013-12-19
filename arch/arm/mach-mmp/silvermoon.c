@@ -18,6 +18,7 @@
 #include <linux/mtd/partitions.h>
 #include <linux/mtd/nand.h>
 #include <linux/interrupt.h>
+#include <linux/platform_data/gpio_backlight.h>
 #include <linux/platform_data/mv_usb.h>
 #include <linux/mmc/sdhci.h>
 
@@ -218,6 +219,20 @@ static struct mv_usb_platform_data pxa168_sph_pdata = {
 };
 #endif
 
+static struct gpio_backlight_platform_data silvermoon_gpio_backlight_data = {
+	.fbdev = NULL, // FIXME what should this be?
+	.gpio = 84,
+	.def_value = 1,
+	.name = "backlight",
+};
+
+static struct platform_device silvermoon_device_gpio_backlight = {
+	.name = "gpio-backlight",
+	.dev = {
+		.platform_data = &silvermoon_gpio_backlight_data,
+	},
+};
+
 /* Chosen to not conflict with SW_HEADPHONE_INSERT = 0x02 */
 #define SW_SILVERMOON_SD_CARD	12
 #define SW_SILVERMOON_XD_CARD	13
@@ -291,7 +306,7 @@ static struct gpio_keys_platform_data silvermoon_key_data = {
 	.nbuttons = ARRAY_SIZE(silvermoon_buttons),
 };
 
-static struct platform_device silvermoon_gpio_keys_device = {
+static struct platform_device silvermoon_device_gpio_keys = {
 	.name = "gpio-keys",
 	.id = -1,
 	.num_resources = 0,
@@ -302,7 +317,8 @@ static struct platform_device silvermoon_gpio_keys_device = {
 
 static struct platform_device *silvermoon_devices[] = {
 	&pxa168_device_gpio,
-	&silvermoon_gpio_keys_device,
+	&silvermoon_device_gpio_backlight,
+	&silvermoon_device_gpio_keys,
 };
 
 static void __init silvermoon_init(void)
