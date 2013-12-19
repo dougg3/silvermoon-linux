@@ -8,6 +8,7 @@
  *  publishhed by the Free Software Foundation.
  */
 #include <linux/gpio.h>
+#include <linux/gpio_keys.h>
 #include <linux/gpio-pxa.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
@@ -28,7 +29,6 @@
 #include <mach/irqs.h>
 #include <video/pxa168fb.h>
 #include <linux/input.h>
-#include <linux/platform_data/keypad-pxa27x.h>
 
 #include "common.h"
 
@@ -113,7 +113,7 @@ static unsigned long common_pin_config[] __initdata = {
 	GPIO94_MMC2_CMD,
 	GPIO95_MMC2_CLK,
 
-	/* LCD power */
+	/* LCD power - switches to AF2 when in use! */
 	MFP_CFG_DRV(GPIO84, AF0, SLOW),
 
 	/* Touchscreen */
@@ -122,7 +122,7 @@ static unsigned long common_pin_config[] __initdata = {
 	MFP_CFG(GPIO120, AF1),
 	MFP_CFG(GPIO121, AF1),
 
-	/* Bend sensor detect */
+	/* Top button */
 	MFP_CFG(GPIO89, AF0),
 
 	/* Headphone jack detect */
@@ -139,7 +139,7 @@ static unsigned long common_pin_config[] __initdata = {
 	MFP_CFG(GPIO103, AF0), /* Compact Flash */
 };
 
-static struct pxa_gpio_platform_data pxa168_gpio_pdata = {
+static struct pxa_gpio_platform_data silvermoon_pxa_gpio_data = {
 	.irq_base	= MMP_GPIO_TO_IRQ(0),
 };
 
@@ -218,6 +218,93 @@ static struct mv_usb_platform_data pxa168_sph_pdata = {
 };
 #endif
 
+/* Chosen to not conflict with SW_HEADPHONE_INSERT = 0x02 */
+#define SW_SILVERMOON_SD_CARD	12
+#define SW_SILVERMOON_XD_CARD	13
+#define SW_SILVERMOON_MS_CARD	14
+#define SW_SILVERMOON_CF_CARD	15
+
+static struct gpio_keys_button silvermoon_buttons[] = {
+	{
+		.type = EV_KEY,
+		.code = BTN_TOP,
+		.gpio = 89,
+		.active_low = 1,
+		.wakeup = 1,
+		.debounce_interval = 10,
+		.desc = "Chumby button",
+	},
+
+	{
+		.type = EV_SW,
+		.code = SW_HEADPHONE_INSERT,
+		.gpio = 97,
+		.active_low = 1,
+		.wakeup = 1,
+		.debounce_interval = 200,
+		.desc = "Headphone jack",
+	},
+
+	{
+		.type = EV_SW,
+		.code = SW_SILVERMOON_SD_CARD,
+		.gpio = 100,
+		.active_low = 1,
+		.wakeup = 1,
+		.debounce_interval = 200,
+		.desc = "SD card present",
+	},
+
+	{
+		.type = EV_SW,
+		.code = SW_SILVERMOON_XD_CARD,
+		.gpio = 101,
+		.active_low = 1,
+		.wakeup = 1,
+		.debounce_interval = 200,
+		.desc = "XD card present",
+	},
+
+	{
+		.type = EV_SW,
+		.code = SW_SILVERMOON_MS_CARD,
+		.gpio = 102,
+		.active_low = 1,
+		.wakeup = 1,
+		.debounce_interval = 200,
+		.desc = "MS card present",
+	},
+
+	{
+		.type = EV_SW,
+		.code = SW_SILVERMOON_CF_CARD,
+		.gpio = 103,
+		.active_low = 1,
+		.wakeup = 1,
+		.debounce_interval = 200,
+		.desc = "CF card present",
+	},
+};
+
+static struct gpio_keys_platform_data silvermoon_key_data = {
+	.buttons = silvermoon_buttons,
+	.nbuttons = ARRAY_SIZE(silvermoon_buttons),
+};
+
+static struct platform_device silvermoon_gpio_keys_device = {
+	.name = "gpio-keys",
+	.id = -1,
+	.num_resources = 0,
+	.dev = {
+		.platform_data = &silvermoon_key_data,
+	},
+};
+
+static struct platform_device *silvermoon_devices[] = {
+	&pxa168_device_gpio,
+	&silvermoon_gpio_keys_device,
+};
+
 static void __init silvermoon_init(void)
 {
 	mfp_config(ARRAY_AND_SIZE(common_pin_config));
@@ -241,9 +328,12 @@ static void __init silvermoon_init(void)
 	pxa168_add_sdh(1, &chumby8_sdh_platdata);
 	pxa168_add_sdh(2, &chumby8_sdh_platdata);
 	pxa168_add_fb(&chumby8_lcd_info);
-	platform_device_add_data(&pxa168_device_gpio, &pxa168_gpio_pdata,
-				 sizeof(struct pxa_gpio_platform_data));
-	platform_device_register(&pxa168_device_gpio);
+
+	platform_device_add_data(&pxa168_device_gpio,
+			&silvermoon_pxa_gpio_data,
+			sizeof(silvermoon_pxa_gpio_data));
+
+	platform_add_devices(ARRAY_AND_SIZE(silvermoon_devices));
 
 #if defined(CONFIG_USB_EHCI_MV)
 	pxa168_add_usb_host(&pxa168_sph_pdata);
