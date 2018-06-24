@@ -233,11 +233,6 @@ static int armada_drm_probe(struct platform_device *pdev)
 {
 	struct component_match *match = NULL;
 	struct device *dev = &pdev->dev;
-	int ret;
-
-	ret = drm_of_component_probe(dev, component_compare_dev_name, &armada_master_ops);
-	if (ret != -EINVAL)
-		return ret;
 
 	if (dev->platform_data) {
 		char **devices = dev->platform_data;
@@ -259,6 +254,22 @@ static int armada_drm_probe(struct platform_device *pdev)
 			if (d && d->of_node)
 				armada_add_endpoints(dev, &match, d->of_node);
 			put_device(d);
+		}
+	} else {
+		struct device_node *np;
+
+		for_each_compatible_node(np, NULL, "marvell,armada-lcdc") {
+			if (!of_device_is_available(np))
+				continue;
+
+			drm_of_component_match_add(dev, &match, component_compare_of, np);
+		}
+
+		for_each_compatible_node(np, NULL, "marvell,armada-lcdc") {
+			if (!of_device_is_available(np))
+				continue;
+
+			armada_add_endpoints(dev, &match, np);
 		}
 	}
 
@@ -297,8 +308,11 @@ static struct platform_driver armada_drm_platform_driver = {
 	.id_table = armada_drm_platform_ids,
 };
 
+static struct platform_device *armada_device;
+
 static int __init armada_drm_init(void)
 {
+	struct device_node *np;
 	int ret;
 
 	if (drm_firmware_drivers_only())
@@ -306,16 +320,40 @@ static int __init armada_drm_init(void)
 
 	ret = platform_driver_register(&armada_lcd_platform_driver);
 	if (ret)
-		return ret;
+		goto err_lcd;
+
 	ret = platform_driver_register(&armada_drm_platform_driver);
 	if (ret)
-		platform_driver_unregister(&armada_lcd_platform_driver);
+		goto err_drm;
+
+	for_each_compatible_node(np, NULL, "marvell,armada-lcdc") {
+		if (!of_device_is_available(np))
+			continue;
+
+		of_node_put(np);
+		armada_device = platform_device_register_simple(
+					"armada-drm", -1, NULL, 0);
+		if (IS_ERR(armada_device)) {
+			ret = PTR_ERR(armada_device);
+			goto err_dev;
+		}
+		break;
+	}
+	return 0;
+
+ err_dev:
+	platform_driver_unregister(&armada_drm_platform_driver);
+ err_drm:
+	platform_driver_unregister(&armada_lcd_platform_driver);
+ err_lcd:
 	return ret;
 }
 module_init(armada_drm_init);
 
 static void __exit armada_drm_exit(void)
 {
+	if (armada_device)
+		platform_device_unregister(armada_device);
 	platform_driver_unregister(&armada_drm_platform_driver);
 	platform_driver_unregister(&armada_lcd_platform_driver);
 }
