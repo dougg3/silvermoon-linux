@@ -75,6 +75,17 @@ config POWER_RESET_BRCMSTB
 	  Say Y here if you have a Broadcom STB board and you wish
 	  to have restart support.
 
+config POWER_RESET_CHUMBY8
+	bool "Chumby 8 power-off and reset driver"
+	depends on ARCH_MMP
+	depends on OF && HAS_IOMEM
+	help
+	  This driver provides power-off and reset support for the
+	  Chumby 8 board.
+
+	  Say Y here if you have a Chumby 8 board and you wish
+	  to have restart and power-off support.
+
 config POWER_RESET_GEMINI_POWEROFF
 	bool "Cortina Gemini power-off driver"
 	depends on ARCH_GEMINI || COMPILE_TEST
