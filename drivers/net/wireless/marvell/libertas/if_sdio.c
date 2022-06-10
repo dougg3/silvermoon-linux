@@ -1114,6 +1114,20 @@ static void if_sdio_interrupt(struct sdio_func *func)
 	if (ret)
 		return;
 
+	/* Hack for PXA168: the card interrupt is cleared, so we need to immediately tell
+	 * the host controller that it can continue listening for SDIO interrupts at this point.
+	 * Otherwise we miss some interrupts. I suspect this is a PXA168 silicon bug?
+	 * It seems like it acts edge-triggered but the SDHCI code assumes level-triggered. */
+	if (!func->card->host->sdio_irq_pending && func->card->host->ops->ack_sdio_irq) {
+		func->card->host->ops->ack_sdio_irq(func->card->host);
+	}
+
+	/* One last piece of PXA168 hack: If I don't read the status register again
+	 * (even though I'm discarding the readback), we miss some interrupts -- usually observed
+	 * when downloading a big file. No idea why, but this extra read of the status register
+	 * seems to avoid the problem. */
+	sdio_readb(card->func, IF_SDIO_H_INT_STATUS, &ret);
+
 	/*
 	 * Ignore the define name, this really means the card has
 	 * successfully received the command.
