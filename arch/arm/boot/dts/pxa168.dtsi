@@ -40,6 +40,57 @@
 				mrvl,intc-nr-irqs = <64>;
 			};
 
+			sdhci1: sdhci@d4280000 {
+				compatible = "mrvl,pxav1-mmc";
+				reg = <0xd4280000 0x1000>;
+				interrupts = <39>;
+				clocks = <&soc_clocks PXA168_CLK_SDH0>,
+					 <&soc_clocks PXA168_CLK_SDH0_SDH1_AXI>;
+				resets = <&soc_clocks PXA168_CLK_SDH0>,
+					 <&soc_clocks PXA168_CLK_SDH0_SDH1_AXI>;
+				clock-names = "PXA-SDHCLK", "PXA-SDHCLK-AXI";
+				mrvl,clk-delay-cycles = <0x1F>;
+				status = "disabled";
+			};
+
+			sdhci2: sdhci@d4281000 {
+				compatible = "mrvl,pxav1-mmc";
+				reg = <0xd4281000 0x1000>;
+				interrupts = <39>;
+				clocks = <&soc_clocks PXA168_CLK_SDH1>,
+					 <&soc_clocks PXA168_CLK_SDH0_SDH1_AXI>;
+				resets = <&soc_clocks PXA168_CLK_SDH1>,
+					 <&soc_clocks PXA168_CLK_SDH0_SDH1_AXI>;
+				clock-names = "PXA-SDHCLK", "PXA-SDHCLK-AXI";
+				mrvl,clk-delay-cycles = <0x1F>;
+				status = "disabled";
+			};
+
+			sdhci3: sdhci@d427e000 {
+				compatible = "mrvl,pxav1-mmc";
+				reg = <0xd427e000 0x1000>;
+				interrupts = <40>;
+				clocks = <&soc_clocks PXA168_CLK_SDH2>,
+					 <&soc_clocks PXA168_CLK_SDH2_SDH3_AXI>;
+				resets = <&soc_clocks PXA168_CLK_SDH2>,
+					 <&soc_clocks PXA168_CLK_SDH2_SDH3_AXI>;
+				clock-names = "PXA-SDHCLK", "PXA-SDHCLK-AXI";
+				mrvl,clk-delay-cycles = <0x1F>;
+				status = "disabled";
+			};
+
+			sdhci4: sdhci@d427f000 {
+				compatible = "mrvl,pxav1-mmc";
+				reg = <0xd427f000 0x1000>;
+				interrupts = <40>;
+				clocks = <&soc_clocks PXA168_CLK_SDH3>,
+					 <&soc_clocks PXA168_CLK_SDH2_SDH3_AXI>;
+				resets = <&soc_clocks PXA168_CLK_SDH3>,
+					 <&soc_clocks PXA168_CLK_SDH2_SDH3_AXI>;
+				clock-names = "PXA-SDHCLK", "PXA-SDHCLK-AXI";
+				mrvl,clk-delay-cycles = <0x1F>;
+				status = "disabled";
+			};
 		};
 
 		apb@d4000000 {	/* APB */
