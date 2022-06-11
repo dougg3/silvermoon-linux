@@ -41,6 +41,10 @@
 #define MMC_CARD		0x1000
 #define MMC_WIDTH		0x0100
 
+struct sdhci_pxav2_host {
+	struct clk *axi_clk; /* optional extra AXI clock to enable */
+};
+
 static void pxav2_reset(struct sdhci_host *host, u8 mask)
 {
 	struct platform_device *pdev = to_platform_device(mmc_dev(host->mmc));
@@ -155,6 +159,7 @@ static int sdhci_pxav2_probe(struct platform_device *pdev)
 {
 	struct sdhci_pltfm_host *pltfm_host;
 	struct sdhci_pxa_platdata *pdata = pdev->dev.platform_data;
+	struct sdhci_pxav2_host *pxav2_host;
 	struct device *dev = &pdev->dev;
 	struct sdhci_host *host = NULL;
 	const struct of_device_id *match;
@@ -162,11 +167,12 @@ static int sdhci_pxav2_probe(struct platform_device *pdev)
 	int ret;
 	struct clk *clk;
 
-	host = sdhci_pltfm_init(pdev, NULL, 0);
+	host = sdhci_pltfm_init(pdev, NULL, sizeof(*pxav2_host));
 	if (IS_ERR(host))
 		return PTR_ERR(host);
 
 	pltfm_host = sdhci_priv(host);
+	pxav2_host = sdhci_pltfm_priv(pltfm_host);
 
 	clk = devm_clk_get(dev, "PXA-SDHCLK");
 	if (IS_ERR(clk)) {
@@ -179,6 +185,15 @@ static int sdhci_pxav2_probe(struct platform_device *pdev)
 	if (ret) {
 		dev_err(&pdev->dev, "failed to enable io clock\n");
 		goto free;
+	}
+
+	pxav2_host->axi_clk = devm_clk_get(dev, "PXA-SDHCLK-AXI");
+	if (!IS_ERR(pxav2_host->axi_clk)) {
+		ret = clk_prepare_enable(pxav2_host->axi_clk);
+		if (ret) {
+			dev_err(&pdev->dev, "failed to enable AXI clock\n");
+			goto disable_clk;
+		}
 	}
 
 	host->quirks = SDHCI_QUIRK_BROKEN_ADMA
@@ -212,14 +227,32 @@ static int sdhci_pxav2_probe(struct platform_device *pdev)
 
 	ret = sdhci_add_host(host);
 	if (ret)
-		goto disable_clk;
+		goto disable_axi_clk;
 
 	return 0;
 
+disable_axi_clk:
+	if (!IS_ERR(pxav2_host->axi_clk))
+		clk_disable_unprepare(pxav2_host->axi_clk);
 disable_clk:
 	clk_disable_unprepare(clk);
 free:
 	sdhci_pltfm_free(pdev);
+	return ret;
+}
+
+static int sdhci_pxav2_remove(struct platform_device *pdev)
+{
+	struct sdhci_host *host = platform_get_drvdata(pdev);
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_pxav2_host *pxav2_host = sdhci_pltfm_priv(pltfm_host);
+	struct clk *axi_clk = pxav2_host->axi_clk;
+
+	int ret = sdhci_pltfm_unregister(pdev);
+
+	if (!IS_ERR(axi_clk))
+		clk_disable_unprepare(axi_clk);
+
 	return ret;
 }
 
@@ -231,7 +264,7 @@ static struct platform_driver sdhci_pxav2_driver = {
 		.pm	= &sdhci_pltfm_pmops,
 	},
 	.probe		= sdhci_pxav2_probe,
-	.remove		= sdhci_pltfm_unregister,
+	.remove		= sdhci_pxav2_remove,
 };
 
 module_platform_driver(sdhci_pxav2_driver);
