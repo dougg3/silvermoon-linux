@@ -91,6 +91,25 @@
 				mrvl,clk-delay-cycles = <0x1F>;
 				status = "disabled";
 			};
+
+			usb_host_phy: usb-phy@d4206000 {
+				compatible = "marvell,pxa168-usb-phy";
+				reg = <0xd4206000 0x40>;
+				#phy-cells = <0>;
+				status = "disabled";
+			};
+
+			usb_host: usb@d4209000 {
+				compatible = "marvell,pxau2o-ehci";
+				reg = <0xd4209000 0x200>;
+				interrupts = <51>;
+				clocks = <&soc_clocks PXA168_CLK_SPH>;
+				resets = <&soc_clocks PXA168_CLK_SPH>;
+				clock-names = "USBCLK";
+				phys = <&usb_host_phy>;
+				phy-names = "usb";
+				status = "disabled";
+			};
 		};
 
 		apb@d4000000 {	/* APB */
