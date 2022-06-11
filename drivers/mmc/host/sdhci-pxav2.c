@@ -84,6 +84,18 @@ static void pxav2_reset(struct sdhci_host *host, u8 mask)
 	}
 }
 
+static inline u16 pxav1_readw(struct sdhci_host *host, int reg)
+{
+	u32 temp;
+	/* Workaround for data abort exception on SDH2 and SDH4 on PXA168 */
+	if (reg == SDHCI_HOST_VERSION) {
+		temp = readl(host->ioaddr + SDHCI_HOST_VERSION - 2) >> 16;
+		return temp & 0xffff;
+	}
+
+	return readw(host->ioaddr + reg);
+}
+
 static void pxav2_mmc_set_bus_width(struct sdhci_host *host, int width)
 {
 	u8 ctrl;
@@ -105,6 +117,15 @@ static void pxav2_mmc_set_bus_width(struct sdhci_host *host, int width)
 	writeb(ctrl, host->ioaddr + SDHCI_HOST_CONTROL);
 }
 
+static const struct sdhci_ops pxav1_sdhci_ops = {
+	.read_w        = pxav1_readw,
+	.set_clock     = sdhci_set_clock,
+	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
+	.set_bus_width = pxav2_mmc_set_bus_width,
+	.reset         = pxav2_reset,
+	.set_uhs_signaling = sdhci_set_uhs_signaling,
+};
+
 static const struct sdhci_ops pxav2_sdhci_ops = {
 	.set_clock     = sdhci_set_clock,
 	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
@@ -117,6 +138,9 @@ static const struct sdhci_ops pxav2_sdhci_ops = {
 static const struct of_device_id sdhci_pxav2_of_match[] = {
 	{
 		.compatible = "mrvl,pxav2-mmc",
+	},
+	{
+		.compatible = "mrvl,pxav1-mmc",
 	},
 	{},
 };
@@ -223,7 +247,12 @@ static int sdhci_pxav2_probe(struct platform_device *pdev)
 			host->mmc->pm_caps |= pdata->pm_caps;
 	}
 
-	host->ops = &pxav2_sdhci_ops;
+	if (match && of_device_is_compatible(dev->of_node, "mrvl,pxav1-mmc")) {
+		host->quirks |= SDHCI_QUIRK_NO_BUSY_IRQ | SDHCI_QUIRK_NO_HISPD_BIT;
+		host->ops = &pxav1_sdhci_ops;
+	} else {
+		host->ops = &pxav2_sdhci_ops;
+	}
 
 	ret = sdhci_add_host(host);
 	if (ret)
