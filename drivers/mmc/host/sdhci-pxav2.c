@@ -20,6 +20,9 @@
 #include <linux/slab.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
+#include <linux/mmc/sdio.h>
+#include <linux/mmc/mmc.h>
+#include <linux/pinctrl/consumer.h>
 
 #include "sdhci.h"
 #include "sdhci-pltfm.h"
@@ -43,6 +46,9 @@
 
 struct sdhci_pxav2_host {
 	struct clk *axi_clk; /* optional extra AXI clock to enable */
+	struct pinctrl *pinctrl;
+	struct pinctrl_state *pins_default;
+	struct pinctrl_state *pins_sdio_irq_fix; /* for SDIO errata on pxa168 */
 };
 
 static void pxav2_reset(struct sdhci_host *host, u8 mask)
@@ -94,6 +100,51 @@ static inline u16 pxav1_readw(struct sdhci_host *host, int reg)
 	}
 
 	return readw(host->ioaddr + reg);
+}
+
+static void (*old_post_req)(struct mmc_host *mmc, struct mmc_request *mrq, int err);
+
+static void pxav1_post_req(struct mmc_host *mmc, struct mmc_request *mrq, int err)
+{
+	struct sdhci_host *host = mmc_priv(mmc);
+	struct sdhci_pxav2_host *pxav2_host;
+	struct mmc_command dummy_cmd = {};
+	int dummy_err;
+	u16 tmp;
+
+	// If this is an SDIO command, we have to do fixups to ensure we receive card IRQs afterward
+	if (!err && mrq->cmd && !mrq->cmd->error &&
+	    (mrq->cmd->opcode == SD_IO_RW_DIRECT ||
+	    mrq->cmd->opcode == SD_IO_RW_EXTENDED)) {
+		// Reset data port
+		tmp = readw(host->ioaddr + SDHCI_TIMEOUT_CONTROL);
+		tmp |= 0x400;
+		writew(tmp, host->ioaddr + SDHCI_TIMEOUT_CONTROL);
+
+		// Now the clock will be stopped, so we need to restart the clock
+		// by sending a dummy CMD0
+		pxav2_host = sdhci_pltfm_priv(sdhci_priv(host));
+
+		// Set as high output rather than MMC function while we do CMD0
+		if (pxav2_host->pinctrl && pxav2_host->pins_sdio_irq_fix)
+			pinctrl_select_state(pxav2_host->pinctrl, pxav2_host->pins_sdio_irq_fix);
+
+		dummy_cmd.opcode = MMC_GO_IDLE_STATE;
+		dummy_cmd.arg = 0;
+		dummy_cmd.flags = MMC_RSP_SPI_R1 | MMC_RSP_NONE | MMC_CMD_BC;
+
+		dummy_err = mmc_wait_for_cmd(host->mmc, &dummy_cmd, 0);
+		if (dummy_err)
+			printk("Error waiting: %d", err);
+
+		// Set as MMC function after dummy command is complete
+		if (pxav2_host->pinctrl && pxav2_host->pins_default)
+			pinctrl_select_state(pxav2_host->pinctrl, pxav2_host->pins_default);
+	}
+
+	/* pass onto SDHCI host driver now */
+	if (old_post_req)
+		old_post_req(mmc, mrq, err);
 }
 
 static void pxav2_mmc_set_bus_width(struct sdhci_host *host, int width)
@@ -250,6 +301,20 @@ static int sdhci_pxav2_probe(struct platform_device *pdev)
 	if (match && of_device_is_compatible(dev->of_node, "mrvl,pxav1-mmc")) {
 		host->quirks |= SDHCI_QUIRK_NO_BUSY_IRQ | SDHCI_QUIRK_NO_HISPD_BIT;
 		host->ops = &pxav1_sdhci_ops;
+		old_post_req = host->mmc_host_ops.post_req;
+		host->mmc_host_ops.post_req = pxav1_post_req;
+
+		/* set up optional pinctrl for PXA168 SDIO IRQ fix */
+		pxav2_host->pinctrl = devm_pinctrl_get(&pdev->dev);
+		if (!IS_ERR(pxav2_host->pinctrl)) {
+			pxav2_host->pins_sdio_irq_fix = pinctrl_lookup_state(pxav2_host->pinctrl, "state_sdio_irq_fix");
+			if (IS_ERR(pxav2_host->pins_sdio_irq_fix))
+				pxav2_host->pins_sdio_irq_fix = NULL;
+			pxav2_host->pins_default = pinctrl_lookup_state(pxav2_host->pinctrl, "default");
+			if (IS_ERR(pxav2_host->pins_default))
+				pxav2_host->pins_default = NULL;
+		} else
+			pxav2_host->pinctrl = NULL;
 	} else {
 		host->ops = &pxav2_sdhci_ops;
 	}
