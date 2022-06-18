@@ -6,6 +6,34 @@
 
 #include <dt-bindings/clock/marvell,pxa168.h>
 
+#define MFP_PIN_PXA168(gpio)				\
+	((gpio <= 36) ? (0x004c + 4 * gpio) :		\
+	 (gpio <= 55) ? (0x0000 + 4 * (gpio - 37)) :	\
+	 (gpio <= 122) ? (0x00e0 + 4 * (gpio - 56)) :	\
+	 0)
+
+#define MFP_AF0		(0 << 0)
+#define MFP_AF1		(1 << 0)
+#define MFP_AF2		(2 << 0)
+#define MFP_AF3		(3 << 0)
+#define MFP_AF4		(4 << 0)
+#define MFP_AF5		(5 << 0)
+#define MFP_AF6		(6 << 0)
+#define MFP_AF7		(7 << 0)
+
+#define MFP_DSMSK	(0x3 << 10)
+#define MFP_DS01X	< (0x0 << 10) MFP_DSMSK >
+#define MFP_DS02X	< (0x1 << 10) MFP_DSMSK >
+#define MFP_DS03X	< (0x2 << 10) MFP_DSMSK >
+#define MFP_DS04X	< (0x3 << 10) MFP_DSMSK >
+
+#define MPF_PULL_MSK	(0x7 << 13)
+#define MPF_PULL_DOWN	< (0x5 << 13) (0x5 << 13) 0 MPF_PULL_MSK >
+#define MPF_PULL_UP	< (0x6 << 13) (0x6 << 13) 0 MPF_PULL_MSK >
+
+/* TODO: MFP60 through MFP62's drive strength bits have special meaning for voltage control
+ * MFP56 through MFP59's drive strength bits control all of MFP56 through MFP85 */
+
 / {
 	#address-cells = <1>;
 	#size-cells = <1>;
@@ -157,6 +185,14 @@
 				status = "disabled";
 			};
 
+			pinctrl: pinctrl@d401e000 {
+				compatible = "pinconf-single";
+				reg = <0xd401e000 0x200>;
+				#pinctrl-cells = <1>;
+				pinctrl-single,register-width = <32>;
+				pinctrl-single,function-mask = <0x7>;
+			};
+
 			gpio@d4019000 {
 				compatible = "marvell,mmp-gpio";
 				#address-cells = <1>;
@@ -167,6 +203,7 @@
 				interrupts = <49>;
 				clocks = <&soc_clocks PXA168_CLK_GPIO>;
 				resets = <&soc_clocks PXA168_CLK_GPIO>;
+				gpio-ranges = <&pinctrl 0 0 128>;
 				interrupt-names = "gpio_mux";
 				interrupt-controller;
 				#interrupt-cells = <2>;
