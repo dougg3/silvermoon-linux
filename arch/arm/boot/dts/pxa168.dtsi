@@ -193,7 +193,7 @@
 				pinctrl-single,function-mask = <0x7>;
 			};
 
-			gpio@d4019000 {
+			gpio: gpio@d4019000 {
 				compatible = "marvell,mmp-gpio";
 				#address-cells = <1>;
 				#size-cells = <1>;
