@@ -1377,4 +1377,16 @@ config TOUCHSCREEN_ZINITIX
 	  To compile this driver as a module, choose M here: the
 	  module will be called zinitix.
 
+config TOUCHSCREEN_CHUMBY8
+	tristate "Chumby 8 touchscreen"
+	depends on SPI_MASTER
+	help
+	  Say Y here if you have a Chumby 8 and want to use its
+	  built-in touchscreen.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called chumby8_ts.s
+
 endif
