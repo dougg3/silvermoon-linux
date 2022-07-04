@@ -1399,4 +1399,16 @@ config TOUCHSCREEN_HIMAX_HX83112B
 	  To compile this driver as a module, choose M here: the
 	  module will be called himax_hx83112b.
 
+config TOUCHSCREEN_CHUMBY8
+	tristate "Chumby 8 touchscreen"
+	depends on SPI_MASTER
+	help
+	  Say Y here if you have a Chumby 8 and want to use its
+	  built-in touchscreen.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called chumby8_ts.s
+
 endif
