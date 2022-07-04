@@ -198,6 +198,11 @@ static bool is_mmp2_ssp(const struct driver_data *drv_data)
 	return drv_data->ssp_type == MMP2_SSP;
 }
 
+static bool is_pxa168_ssp(const struct driver_data *drv_data)
+{
+	return drv_data->ssp_type == PXA168_SSP;
+}
+
 static bool is_mrfld_ssp(const struct driver_data *drv_data)
 {
 	return drv_data->ssp_type == MRFLD_SSP;
@@ -921,6 +926,10 @@ static unsigned int pxa2xx_ssp_get_clk_div(struct driver_data *drv_data,
 	case QUARK_X1000_SSP:
 		clk_div = quark_x1000_get_clk_div(rate, &chip->dds_rate);
 		break;
+	case PXA168_SSP:
+		/* PXA168 doesn't have a clock divider; you're stuck with what you've got */
+		clk_div = 0;
+		break;
 	default:
 		clk_div = ssp_get_clk_div(drv_data, rate);
 		break;
@@ -1548,9 +1557,11 @@ static int pxa2xx_spi_probe(struct platform_device *pdev)
 	controller->max_speed_hz = clk_get_rate(ssp->clk);
 	/*
 	 * Set minimum speed for all other platforms than Intel Quark which is
-	 * able do under 1 Hz transfers.
+	 * able do under 1 Hz transfers. PXA168 doesn't have a divider.
 	 */
-	if (!pxa25x_ssp_comp(drv_data))
+	if (is_pxa168_ssp(drv_data))
+		controller->min_speed_hz = controller->max_speed_hz;
+	else if (!pxa25x_ssp_comp(drv_data))
 		controller->min_speed_hz =
 			DIV_ROUND_UP(controller->max_speed_hz, 4096);
 	else if (!is_quark_x1000_ssp(drv_data))
@@ -1756,6 +1767,7 @@ MODULE_DEVICE_TABLE(acpi, pxa2xx_spi_acpi_match);
 
 static const struct of_device_id pxa2xx_spi_of_match[] __maybe_unused = {
 	{ .compatible = "marvell,mmp2-ssp", .data = (void *)MMP2_SSP },
+	{ .compatible = "marvell,pxa168-ssp", .data = (void *)PXA168_SSP },
 	{}
 };
 MODULE_DEVICE_TABLE(of, pxa2xx_spi_of_match);
