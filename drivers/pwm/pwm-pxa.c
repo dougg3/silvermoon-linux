@@ -103,6 +103,11 @@ static int pxa_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
 static void pxa_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
 {
 	struct pxa_pwm_chip *pc = to_pxa_pwm_chip(chip);
+	unsigned long offset = pwm->hwpwm ? 0x10 : 0;
+
+	/* ensure the duty cycle is set to 0 before turning off the clock.
+	 * otherwise, the PWM pin might stay on. */
+	writel(0, pc->mmio_base + offset + PWMDCR);
 
 	clk_disable_unprepare(pc->clk);
 }
