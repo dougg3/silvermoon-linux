@@ -64,7 +64,6 @@ static int pxa_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
 	unsigned long long c;
 	unsigned long period_cycles, prescale, pv, dc;
 	unsigned long offset;
-	int rc;
 
 	offset = pwm->hwpwm ? 0x10 : 0;
 
@@ -86,18 +85,11 @@ static int pxa_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
 	else
 		dc = mul_u64_u64_div_u64(pv + 1, duty_ns, period_ns);
 
-	/* NOTE: the clock to PWM has to be enabled first
-	 * before writing to the registers
-	 */
-	rc = clk_prepare_enable(pc->clk);
-	if (rc < 0)
-		return rc;
-
+	/* clock is required here. we can assume it's already on. */
 	writel(prescale, pc->mmio_base + offset + PWMCR);
 	writel(dc, pc->mmio_base + offset + PWMDCR);
 	writel(pv, pc->mmio_base + offset + PWMPCR);
 
-	clk_disable_unprepare(pc->clk);
 	return 0;
 }
 
@@ -130,12 +122,20 @@ static int pxa_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 		return 0;
 	}
 
-	err = pxa_pwm_config(chip, pwm, state->duty_cycle, state->period);
-	if (err)
-		return err;
+	/* turn the clock on first; it's needed in order to apply the new config */
+	if (!pwm->state.enabled) {
+		err = pxa_pwm_enable(chip, pwm);
+		if (err)
+			return err;
+	}
 
-	if (!pwm->state.enabled)
-		return pxa_pwm_enable(chip, pwm);
+	/* now apply the new config */
+	err = pxa_pwm_config(chip, pwm, state->duty_cycle, state->period);
+	if (err) {
+		/* if configuration fails, turn the PWM back off */
+		pxa_pwm_disable(chip, pwm);
+		return err;
+	}
 
 	return 0;
 }
