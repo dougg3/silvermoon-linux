@@ -147,6 +147,16 @@
 			reg = <0xd4000000 0x00200000>;
 			ranges;
 
+			dma: dma-controller@d4000000 {
+				compatible = "marvell,pdma-1.0";
+				reg = <0xd4000000 0x10000>;
+				interrupts = <48>;
+				#dma-channels = <32>;
+				#dma-cells = <2>;
+				#dma-requests = <100>;
+				status = "disabled";
+			};
+
 			timer0: timer@d4014000 {
 				compatible = "mrvl,mmp-timer";
 				reg = <0xd4014000 0x100>;
@@ -267,6 +277,9 @@
 				clocks = <&soc_clocks PXA168_CLK_SSP0>;
 				resets = <&soc_clocks PXA168_CLK_SSP0>;
 				interrupts = <3>;
+				dmas = <&dma 52 0
+					&dma 53 1>;
+				dma-names = "rx", "tx";
 				status = "disabled";
 			};
 
@@ -278,6 +291,9 @@
 				clocks = <&soc_clocks PXA168_CLK_SSP1>;
 				resets = <&soc_clocks PXA168_CLK_SSP1>;
 				interrupts = <2>;
+				dmas = <&dma 54 0
+					&dma 55 1>;
+				dma-names = "rx", "tx";
 				status = "disabled";
 			};
 
@@ -289,6 +305,9 @@
 				clocks = <&soc_clocks PXA168_CLK_SSP2>;
 				resets = <&soc_clocks PXA168_CLK_SSP2>;
 				interrupts = <1>;
+				dmas = <&dma 56 0
+					&dma 57 1>;
+				dma-names = "rx", "tx";
 				status = "disabled";
 			};
 
@@ -300,6 +319,9 @@
 				clocks = <&soc_clocks PXA168_CLK_SSP3>;
 				resets = <&soc_clocks PXA168_CLK_SSP3>;
 				interrupts = <0>;
+				dmas = <&dma 58 0
+					&dma 59 1>;
+				dma-names = "rx", "tx";
 				status = "disabled";
 			};
 
@@ -311,6 +333,9 @@
 				clocks = <&soc_clocks PXA168_CLK_SSP4>;
 				resets = <&soc_clocks PXA168_CLK_SSP4>;
 				interrupts = <17>;
+				dmas = <&dma 60 0
+					&dma 61 1>;
+				dma-names = "rx", "tx";
 				status = "disabled";
 			};
 
