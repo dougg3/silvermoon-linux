@@ -31,6 +31,13 @@
 #include <sound/pxa2xx-lib.h>
 #include <sound/dmaengine_pcm.h>
 
+// TODO: Fix this to go through common clock API
+#define APB_VIRT_BASE		IOMEM(0xfe000000)
+#define MPMU_VIRT_BASE		(APB_VIRT_BASE + 0x50000)
+#define MPMU_REG(off)		(MPMU_VIRT_BASE + (off))
+#define MPMU_ASYSDR		MPMU_REG(0x1050)
+#define MPMU_ASSPDR		MPMU_REG(0x1054)
+
 #include "pxa-ssp.h"
 
 /*
@@ -52,6 +59,83 @@ struct ssp_priv {
 	uint32_t	psp;
 #endif
 };
+
+/* For simplicity, provide calculations for MCLK assuming MCLK = 256fs */
+struct pxa168_ssp_mclk {
+	unsigned int mclk;
+	unsigned int mclk_denom;
+	unsigned int mclk_num;
+};
+
+static const struct pxa168_ssp_mclk mclk_conf[] = {
+	{12288000,  64, 1625},		/* Used for 48000 */
+	{11289600, 294, 8125},		/* Used for 44100 */
+	{8192000,  128, 4875},		/* Used for 32000 */
+	{6144000,   32, 1625},		/* Used for 24000 */
+	{5644800,  147, 8125},		/* Used for 22050 */
+	{4096000,   64, 4875},		/* Used for 16000 */
+	{2822400,  147, 16250},	/* Used for 11025 */
+	{2048000,   32, 4875},		/* Used for 8000 */
+	{0,        294, 8125},		/* When we are asked to "shut off", leave MCLK running
+					 * in order for the codec to be happy */
+};
+
+/*
+ * Set the SSP ports SYSCLK only from Audio SYSCLK.
+ */
+static int pxa168_ssp_set_dai_sysclk(struct snd_soc_dai *cpu_dai, int clk_id,
+				     unsigned int freq, int dir)
+{
+	struct ssp_priv *priv = snd_soc_dai_get_drvdata(cpu_dai);
+	struct ssp_device *ssp = priv->ssp;
+	unsigned int sscr0, data, asysdr, asspdr;
+	int mclk_index;
+
+	dev_dbg(ssp->dev, "%s id: %d, clk_id %d, freq %u\n",
+		__func__, cpu_dai->id, clk_id, freq);
+
+	/* Locate the entry for the matching frequency */
+	for (mclk_index = 0; mclk_index < ARRAY_SIZE(mclk_conf); mclk_index++) {
+		if (freq == mclk_conf[mclk_index].mclk)
+			break;
+	}
+
+	if (mclk_index >= ARRAY_SIZE(mclk_conf)) {
+		dev_warn(ssp->dev, "Wrong frequency on SYSCLK\n");
+		return -EINVAL;
+	}
+	asysdr = (mclk_conf[mclk_index].mclk_num << 16)
+		| mclk_conf[mclk_index].mclk_denom;
+	asspdr = 0;
+	/* If ASYSCLK is supplied by pxa168, ASSPDR should be configured. */
+	if (freq != 0 && dir == SND_SOC_CLOCK_OUT)
+		/* Currently assume a divider of 8 to work properly with 256fs */
+		asspdr = (8 << 16) | 1;
+
+	/* clear ECS, NCS, MOD, ACS */
+	sscr0 = pxa_ssp_read_reg(ssp, SSCR0);
+	data = sscr0 & ~(SSCR0_ECS | SSCR0_NCS | SSCR0_MOD | SSCR0_ACS);
+	if (sscr0 != data)
+		pxa_ssp_write_reg(ssp, SSCR0, data);
+
+	/* update divider register in MPMU */
+	__raw_writel(asysdr, MPMU_ASYSDR);
+	__raw_writel(asspdr, MPMU_ASSPDR);
+
+	return 0;
+}
+
+static int pxa168_ssp_hw_free(struct snd_pcm_substream *substream,
+			      struct snd_soc_dai *dai)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_dai *cpu_dai = asoc_rtd_to_cpu(rtd, 0);
+	struct ssp_priv *priv = snd_soc_dai_get_drvdata(cpu_dai);
+	struct ssp_device *ssp = priv->ssp;
+
+	pxa_ssp_disable(ssp);
+	return 0;
+}
 
 static void dump_registers(struct ssp_device *ssp)
 {
@@ -879,9 +963,49 @@ static const struct snd_soc_component_driver pxa_ssp_component = {
 	.legacy_dai_naming	= 1,
 };
 
+/* DAI driver for PXA168. It's mostly the same as PXA2xx/3xx */
+
+#define PXA168_SSP_RATES (SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_11025 |\
+			  SNDRV_PCM_RATE_16000 | SNDRV_PCM_RATE_22050 |	\
+			  SNDRV_PCM_RATE_32000 | SNDRV_PCM_RATE_44100 |	\
+			  SNDRV_PCM_RATE_48000)
+
+#define PXA168_SSP_FORMATS (SNDRV_PCM_FMTBIT_S16_LE | NDRV_PCM_FMTBIT_S32_LE)
+
+static const struct snd_soc_dai_ops pxa168_ssp_dai_ops = {
+	.probe		= pxa_ssp_probe,
+	.remove		= pxa_ssp_remove,
+	.startup	= pxa_ssp_startup,
+	.shutdown	= pxa_ssp_shutdown,
+	.trigger	= pxa_ssp_trigger,
+	.hw_params	= pxa_ssp_hw_params,
+	.hw_free	= pxa168_ssp_hw_free,
+	.set_sysclk	= pxa168_ssp_set_dai_sysclk,
+	.set_fmt	= pxa_ssp_set_dai_fmt,
+	.set_tdm_slot	= pxa_ssp_set_dai_tdm_slot,
+	.set_tristate	= pxa_ssp_set_dai_tristate,
+};
+
+static struct snd_soc_dai_driver pxa168_ssp_dai = {
+		.playback = {
+			.channels_min = 1,
+			.channels_max = 2,
+			.rates = PXA_SSP_RATES,
+			.formats = PXA_SSP_FORMATS,
+		},
+		.capture = {
+			 .channels_min = 1,
+			 .channels_max = 2,
+			.rates = PXA_SSP_RATES,
+			.formats = PXA_SSP_FORMATS,
+		 },
+		.ops = &pxa168_ssp_dai_ops,
+};
+
 #ifdef CONFIG_OF
 static const struct of_device_id pxa_ssp_of_ids[] = {
 	{ .compatible = "mrvl,pxa-ssp-dai", .data = &pxa_ssp_dai },
+	{ .compatible = "mrvl,pxa168-ssp-dai", .data = &pxa168_ssp_dai },
 	{}
 };
 MODULE_DEVICE_TABLE(of, pxa_ssp_of_ids);
