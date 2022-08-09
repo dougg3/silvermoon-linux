@@ -383,6 +383,7 @@ static int pxa_ssp_set_dai_fmt(struct snd_soc_dai *cpu_dai,
 
 	switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
 	case SND_SOC_DAIFMT_I2S:
+	case SND_SOC_DAIFMT_LEFT_J:
 	case SND_SOC_DAIFMT_DSP_A:
 	case SND_SOC_DAIFMT_DSP_B:
 		break;
@@ -453,6 +454,7 @@ static int pxa_ssp_configure_dai_fmt(struct ssp_priv *priv)
 
 	switch (priv->dai_fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
 	case SND_SOC_DAIFMT_I2S:
+	case SND_SOC_DAIFMT_LEFT_J:
 		sscr0 |= SSCR0_PSP;
 		sscr1 |= SSCR1_RWOT | SSCR1_TRAIL;
 		/* See hw_params() */
@@ -644,6 +646,30 @@ static int pxa_ssp_hw_params(struct snd_pcm_substream *substream,
 			sspsp |= SSPSP_SFRMWDTH(width + 1);
 			sspsp |= SSPSP_SFRMDLY((width + 1) * 2);
 			sspsp |= SSPSP_DMYSTRT(1);
+		}
+
+		pxa_ssp_write_reg(ssp, SSPSP, sspsp);
+		break;
+	case SND_SOC_DAIFMT_LEFT_J:
+		sspsp = pxa_ssp_read_reg(ssp, SSPSP);
+
+		/* Clear out the bits we're going to write to */
+		sspsp &= ~SSPSP_SFRMWDTH(0x3F);
+		sspsp &= ~SSPSP_SFRMDLY(0x7F);
+		sspsp &= ~SSPSP_DMYSTRT(0x3);
+		sspsp &= ~SSPSP_DMYSTOP(0x3);
+		sspsp &= ~SSPSP_EDMYSTOP(0x7);
+
+		/* Make LRCLK low for left, high for right */
+		sspsp |= SSPSP_SFRMWDTH(width);
+		sspsp |= SSPSP_SFRMDLY(width * 2);
+		/* If 1 channel, add a 2nd channel's worth of dummy data so we
+		 * don't need to set a different bit clock for mono. This won't
+		 * work for 32-bit though because the DMYSTOP range is 0-31.
+		 * If someone needs 32, they'll need to figure out how. */
+		if (chn == 1 && width < 32) {
+			sspsp |= SSPSP_DMYSTOP(width & 0x3);
+			sspsp |= SSPSP_EDMYSTOP((width >> 2) & 0x7);
 		}
 
 		pxa_ssp_write_reg(ssp, SSPSP, sspsp);
