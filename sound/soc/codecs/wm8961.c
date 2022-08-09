@@ -973,6 +973,12 @@ static const struct i2c_device_id wm8961_i2c_id[] = {
 };
 MODULE_DEVICE_TABLE(i2c, wm8961_i2c_id);
 
+static const struct of_device_id wm8961_of_match[] = {
+       { .compatible = "wlf,wm8961", },
+       { }
+};
+MODULE_DEVICE_TABLE(of, wm8961_of_match);
+
 static struct i2c_driver wm8961_i2c_driver = {
 	.driver = {
 		.name = "wm8961",
