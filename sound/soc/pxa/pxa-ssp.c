@@ -19,6 +19,7 @@
 #include <linux/pxa2xx_ssp.h>
 #include <linux/of.h>
 #include <linux/dmaengine.h>
+#include <linux/of_device.h>
 
 #include <asm/irq.h>
 
@@ -880,7 +881,7 @@ static const struct snd_soc_component_driver pxa_ssp_component = {
 
 #ifdef CONFIG_OF
 static const struct of_device_id pxa_ssp_of_ids[] = {
-	{ .compatible = "mrvl,pxa-ssp-dai" },
+	{ .compatible = "mrvl,pxa-ssp-dai", .data = &pxa_ssp_dai },
 	{}
 };
 MODULE_DEVICE_TABLE(of, pxa_ssp_of_ids);
@@ -888,8 +889,16 @@ MODULE_DEVICE_TABLE(of, pxa_ssp_of_ids);
 
 static int asoc_ssp_probe(struct platform_device *pdev)
 {
+	struct snd_soc_dai_driver *dai_driver = &pxa_ssp_dai;
+	struct device *dev = &pdev->dev;
+	if (dev->of_node) {
+		const struct of_device_id *id =
+			of_match_device(of_match_ptr(pxa_ssp_of_ids), dev);
+		dai_driver = (struct snd_soc_dai_driver *)id->data;
+	}
+
 	return devm_snd_soc_register_component(&pdev->dev, &pxa_ssp_component,
-					       &pxa_ssp_dai, 1);
+					       dai_driver, 1);
 }
 
 static struct platform_driver asoc_ssp_driver = {
