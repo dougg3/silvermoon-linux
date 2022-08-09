@@ -560,6 +560,9 @@ static int pxa_ssp_hw_params(struct snd_pcm_substream *substream,
 		if (ssp->type == PXA3xx_SSP)
 			sscr0 |= SSCR0_FPCKE;
 		sscr0 |= SSCR0_DataSize(16);
+		/* If we have two channels, treat it as 32-bit data size. */
+		if (chn > 1)
+			sscr0 |= SSCR0_EDSS;
 		break;
 	case SNDRV_PCM_FORMAT_S24_LE:
 		sscr0 |= (SSCR0_EDSS | SSCR0_DataSize(8));
