@@ -42,6 +42,8 @@ struct ssp_priv {
 	unsigned int sysclk;
 	unsigned int dai_fmt;
 	unsigned int configured_dai_fmt;
+	struct snd_dmaengine_dai_dma_data pcm_stereo_out;
+	struct snd_dmaengine_dai_dma_data pcm_stereo_in;
 #ifdef CONFIG_PM
 	uint32_t	cr0;
 	uint32_t	cr1;
@@ -75,7 +77,6 @@ static int pxa_ssp_startup(struct snd_pcm_substream *substream,
 {
 	struct ssp_priv *priv = snd_soc_dai_get_drvdata(cpu_dai);
 	struct ssp_device *ssp = priv->ssp;
-	struct snd_dmaengine_dai_dma_data *dma;
 	int ret = 0;
 
 	if (!snd_soc_dai_active(cpu_dai)) {
@@ -84,14 +85,6 @@ static int pxa_ssp_startup(struct snd_pcm_substream *substream,
 	}
 
 	clk_prepare_enable(priv->extclk);
-
-	dma = kzalloc(sizeof(struct snd_dmaengine_dai_dma_data), GFP_KERNEL);
-	if (!dma)
-		return -ENOMEM;
-	dma->chan_name = substream->stream == SNDRV_PCM_STREAM_PLAYBACK ?
-		"tx" : "rx";
-
-	snd_soc_dai_set_dma_data(cpu_dai, substream, dma);
 
 	return ret;
 }
@@ -108,9 +101,6 @@ static void pxa_ssp_shutdown(struct snd_pcm_substream *substream,
 	}
 
 	clk_disable_unprepare(priv->extclk);
-
-	kfree(snd_soc_dai_get_dma_data(cpu_dai, substream));
-	snd_soc_dai_set_dma_data(cpu_dai, substream, NULL);
 }
 
 #ifdef CONFIG_PM
@@ -787,6 +777,10 @@ static int pxa_ssp_probe(struct snd_soc_dai *dai)
 
 	priv->dai_fmt = (unsigned int) -1;
 	snd_soc_dai_set_drvdata(dai, priv);
+
+	priv->pcm_stereo_out.chan_name = "tx";
+	priv->pcm_stereo_in.chan_name = "rx";
+	snd_soc_dai_init_dma_data(dai, &priv->pcm_stereo_out, &priv->pcm_stereo_in);
 
 	return 0;
 
