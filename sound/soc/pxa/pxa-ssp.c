@@ -892,6 +892,11 @@ static int pxa_ssp_probe(struct snd_soc_dai *dai)
 	priv->dai_fmt = (unsigned int) -1;
 	snd_soc_dai_set_drvdata(dai, priv);
 
+	/* On the PXA168, we should make sure the master clock is running.
+	 * The codec might need it. Just choose a default value. */
+	if (priv->ssp->type == PXA168_SSP)
+		pxa168_ssp_set_dai_sysclk(dai, 0, 0, SND_SOC_CLOCK_IN);
+
 	priv->pcm_stereo_out.chan_name = "tx";
 	priv->pcm_stereo_in.chan_name = "rx";
 	snd_soc_dai_init_dma_data(dai, &priv->pcm_stereo_out, &priv->pcm_stereo_in);
