@@ -112,9 +112,9 @@ static int pxa168_ssp_set_dai_sysclk(struct snd_soc_dai *cpu_dai, int clk_id,
 		/* Currently assume a divider of 8 to work properly with 256fs */
 		asspdr = (8 << 16) | 1;
 
-	/* clear ECS, NCS, MOD, ACS */
+	/* clear ECS, NCS, ACS */
 	sscr0 = pxa_ssp_read_reg(ssp, SSCR0);
-	data = sscr0 & ~(SSCR0_ECS | SSCR0_NCS | SSCR0_MOD | SSCR0_ACS);
+	data = sscr0 & ~(SSCR0_ECS | SSCR0_NCS | SSCR0_ACS);
 	if (sscr0 != data)
 		pxa_ssp_write_reg(ssp, SSCR0, data);
 
@@ -394,7 +394,7 @@ static int pxa_ssp_set_dai_tdm_slot(struct snd_soc_dai *cpu_dai,
 	else
 		sscr0 |= SSCR0_DataSize(slot_width);
 
-	if (slots > 1) {
+	if (slots > 1 || ssp->type == PXA168_SSP) {
 		/* enable network mode */
 		sscr0 |= SSCR0_MOD;
 
@@ -529,6 +529,9 @@ static int pxa_ssp_configure_dai_fmt(struct ssp_priv *priv)
 	case SND_SOC_DAIFMT_I2S:
 	case SND_SOC_DAIFMT_LEFT_J:
 		sscr0 |= SSCR0_PSP;
+		/* Use network mode for I2S emulation on the PXA168 */
+		if (ssp->type == PXA168_SSP)
+			sscr0 |= SSCR0_MOD;
 		sscr1 |= SSCR1_RWOT | SSCR1_TRAIL;
 		/* See hw_params() */
 		break;
@@ -613,9 +616,12 @@ static int pxa_ssp_hw_params(struct snd_pcm_substream *substream,
 	/* Network mode with one active slot (ttsa == 1) can be used
 	 * to force 16-bit frame width on the wire (for S16_LE), even
 	 * with two channels. Use 16-bit DMA transfers for this case.
+	 * Also use 16-bit DMA transfers on PXA168 with S16_LE, even
+	 * when there are two channels with network mode. Combining
+	 * them into a single 32-bit transfer doesn't work properly.
 	 */
 	pxa_ssp_set_dma_params(ssp,
-		((chn == 2) && (ttsa != 1)) || (width == 32),
+		((ssp->type != PXA168_SSP) && (chn == 2) && (ttsa != 1)) || (width == 32),
 		substream->stream == SNDRV_PCM_STREAM_PLAYBACK, dma_data);
 
 	/* we can only change the settings if the port is not in use */
@@ -626,6 +632,17 @@ static int pxa_ssp_hw_params(struct snd_pcm_substream *substream,
 	if (ret < 0)
 		return ret;
 
+	/* Configure network mode on the PXA168 */
+	if (ssp->type == PXA168_SSP) {
+		/* If we have 2 channels, set up 2 time slots. If we have 1 channel,
+		 * set up only one time slot. This seems silly, but the PXA168
+		 * runs into random garbled audio if the second time slot is left active
+		 * when playing mono sound. Only happens after recording. Weird. */
+		pxa_ssp_set_dai_tdm_slot(cpu_dai, chn > 1 ? 3 : 1, chn > 1 ? 3 : 1, chn, width);
+		pxa_ssp_set_dai_tristate(cpu_dai, 0);
+		ttsa = pxa_ssp_read_reg(ssp, SSTSA) & 0xf;
+	}
+
 	/* clear selected SSP bits */
 	sscr0 = pxa_ssp_read_reg(ssp, SSCR0) & ~(SSCR0_DSS | SSCR0_EDSS);
 
@@ -635,9 +652,6 @@ static int pxa_ssp_hw_params(struct snd_pcm_substream *substream,
 		if (ssp->type == PXA3xx_SSP)
 			sscr0 |= SSCR0_FPCKE;
 		sscr0 |= SSCR0_DataSize(16);
-		/* If we have two channels, treat it as 32-bit data size. */
-		if (chn > 1)
-			sscr0 |= SSCR0_EDSS;
 		break;
 	case SNDRV_PCM_FORMAT_S24_LE:
 		sscr0 |= (SSCR0_EDSS | SSCR0_DataSize(8));
