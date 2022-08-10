@@ -1407,7 +1407,7 @@ pxa2xx_spi_init_pdata(struct platform_device *pdev)
 	pdata->is_slave = device_property_read_bool(dev, "spi-slave");
 	pdata->num_chipselect = 1;
 	pdata->enable_dma = true;
-	pdata->dma_burst_size = 1;
+	pdata->dma_burst_size = 8;
 
 	return pdata;
 }
