@@ -125,18 +125,6 @@ static int pxa168_ssp_set_dai_sysclk(struct snd_soc_dai *cpu_dai, int clk_id,
 	return 0;
 }
 
-static int pxa168_ssp_hw_free(struct snd_pcm_substream *substream,
-			      struct snd_soc_dai *dai)
-{
-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_dai *cpu_dai = asoc_rtd_to_cpu(rtd, 0);
-	struct ssp_priv *priv = snd_soc_dai_get_drvdata(cpu_dai);
-	struct ssp_device *ssp = priv->ssp;
-
-	pxa_ssp_disable(ssp);
-	return 0;
-}
-
 static void dump_registers(struct ssp_device *ssp)
 {
 	dev_dbg(ssp->dev, "SSCR0 0x%08x SSCR1 0x%08x SSTO 0x%08x\n",
@@ -984,7 +972,6 @@ static const struct snd_soc_dai_ops pxa168_ssp_dai_ops = {
 	.shutdown	= pxa_ssp_shutdown,
 	.trigger	= pxa_ssp_trigger,
 	.hw_params	= pxa_ssp_hw_params,
-	.hw_free	= pxa168_ssp_hw_free,
 	.set_sysclk	= pxa168_ssp_set_dai_sysclk,
 	.set_fmt	= pxa_ssp_set_dai_fmt,
 	.set_tdm_slot	= pxa_ssp_set_dai_tdm_slot,
