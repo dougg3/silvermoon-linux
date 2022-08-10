@@ -1368,7 +1368,7 @@ pxa2xx_spi_init_pdata(struct platform_device *pdev)
 	pdata->num_chipselect = num_cs;
 	pdata->is_target = device_property_read_bool(dev, "spi-slave");
 	pdata->enable_dma = true;
-	pdata->dma_burst_size = 1;
+	pdata->dma_burst_size = 8;
 
 	/* If SSP has been already enumerated, use it */
 	if (ssp)
