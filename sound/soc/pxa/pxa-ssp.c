@@ -733,9 +733,8 @@ static int pxa_ssp_hw_params(struct snd_pcm_substream *substream,
 		sspsp &= ~SSPSP_DMYSTOP(0x3);
 		sspsp &= ~SSPSP_EDMYSTOP(0x7);
 
-		/* Make LRCLK low for left, high for right */
+		/* Make LRCLK high for left channel, low for right channel */
 		sspsp |= SSPSP_SFRMWDTH(width);
-		sspsp |= SSPSP_SFRMDLY(width * 2);
 		/* If 1 channel, add a 2nd channel's worth of dummy data so we
 		 * don't need to set a different bit clock for mono. This won't
 		 * work for 32-bit though because the DMYSTOP range is 0-31.
