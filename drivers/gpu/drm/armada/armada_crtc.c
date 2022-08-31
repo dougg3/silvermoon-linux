@@ -14,6 +14,8 @@
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_probe_helper.h>
 #include <drm/drm_vblank.h>
+#include <drm/drm_bridge.h>
+#include <drm/drm_simple_kms_helper.h>
 
 #include "armada_crtc.h"
 #include "armada_drm.h"
@@ -912,6 +914,7 @@ static int armada_drm_crtc_create(struct drm_device *drm, struct device *dev,
 	struct armada_private *priv = drm_to_armada_dev(drm);
 	struct armada_crtc *dcrtc;
 	struct drm_plane *primary;
+	struct drm_bridge *bridge;
 	void __iomem *base;
 	int ret;
 
@@ -927,6 +930,28 @@ static int armada_drm_crtc_create(struct drm_device *drm, struct device *dev,
 
 	if (dev != drm->dev)
 		dev_set_drvdata(dev, dcrtc);
+
+	/* Create a simple encoder for this CRTC to use */
+	ret = drm_simple_encoder_init(drm, &dcrtc->encoder, DRM_MODE_ENCODER_NONE);
+	if (ret < 0) {
+		DRM_ERROR("failed to create Armada encoder\n");
+		goto err_crtc;
+	}
+	dcrtc->encoder.possible_crtcs = 0x1;
+
+	/* Find a bridge to connect */
+	bridge = devm_drm_of_get_bridge(dev, dev->of_node, 0, 0);
+	if (IS_ERR(bridge) && (PTR_ERR(bridge) != -ENODEV)) {
+		ret = PTR_ERR(bridge);
+		goto err_encoder;
+	}
+
+	/* Attach the bridge to the encoder */
+	ret = drm_bridge_attach(&dcrtc->encoder, bridge, NULL, 0);
+	if (ret < 0) {
+		DRM_ERROR("failed to attach Armada bridge\n");
+		goto err_encoder;
+	}
 
 	dcrtc->variant = variant;
 	dcrtc->base = base;
@@ -953,12 +978,12 @@ static int armada_drm_crtc_create(struct drm_device *drm, struct device *dev,
 	ret = devm_request_irq(dev, irq, armada_drm_irq, 0, "armada_drm_crtc",
 			       dcrtc);
 	if (ret < 0)
-		goto err_crtc;
+		goto err_encoder;
 
 	if (dcrtc->variant->init) {
 		ret = dcrtc->variant->init(dcrtc, dev);
 		if (ret)
-			goto err_crtc;
+			goto err_encoder;
 	}
 
 	/* Ensure AXI pipeline is enabled */
@@ -971,13 +996,13 @@ static int armada_drm_crtc_create(struct drm_device *drm, struct device *dev,
 	primary = kzalloc(sizeof(*primary), GFP_KERNEL);
 	if (!primary) {
 		ret = -ENOMEM;
-		goto err_crtc;
+		goto err_encoder;
 	}
 
 	ret = armada_drm_primary_plane_init(drm, primary);
 	if (ret) {
 		kfree(primary);
-		goto err_crtc;
+		goto err_encoder;
 	}
 
 	ret = drm_crtc_init_with_planes(drm, &dcrtc->crtc, primary, NULL,
@@ -997,6 +1022,8 @@ static int armada_drm_crtc_create(struct drm_device *drm, struct device *dev,
 
 err_crtc_init:
 	primary->funcs->destroy(primary);
+err_encoder:
+	drm_encoder_cleanup(&dcrtc->encoder);
 err_crtc:
 	kfree(dcrtc);
 
@@ -1053,6 +1080,7 @@ armada_lcd_unbind(struct device *dev, struct device *master, void *data)
 {
 	struct armada_crtc *dcrtc = dev_get_drvdata(dev);
 
+	drm_encoder_cleanup(&dcrtc->encoder);
 	armada_drm_crtc_destroy(&dcrtc->crtc);
 }
 
