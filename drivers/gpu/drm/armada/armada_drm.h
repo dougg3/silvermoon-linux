@@ -51,6 +51,7 @@ struct armada_variant {
 
 /* Variant ops */
 extern const struct armada_variant armada510_ops;
+extern const struct armada_variant armada168_ops;
 
 struct armada_private {
 	struct drm_device	drm;
