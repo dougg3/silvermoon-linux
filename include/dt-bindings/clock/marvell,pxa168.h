@@ -6,6 +6,7 @@
 #define PXA168_CLK_CLK32		1
 #define PXA168_CLK_VCTCXO		2
 #define PXA168_CLK_PLL1			3
+#define PXA168_CLK_PLL2			4
 #define PXA168_CLK_PLL1_2		8
 #define PXA168_CLK_PLL1_4		9
 #define PXA168_CLK_PLL1_8		10
@@ -62,5 +63,6 @@
 #define PXA168_CLK_SDH3			110
 #define PXA168_CLK_SDH01_AXI		111
 #define PXA168_CLK_SDH23_AXI		112
+#define PXA168_CLK_GC_CORE		113
 
 #endif

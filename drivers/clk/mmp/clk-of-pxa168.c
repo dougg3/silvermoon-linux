@@ -75,6 +75,7 @@ static struct mmp_param_fixed_rate_clk fixed_rate_clks[] = {
 	{PXA168_CLK_CLK32, "clk32", NULL, 0, 32768},
 	{PXA168_CLK_VCTCXO, "vctcxo", NULL, 0, 26000000},
 	{PXA168_CLK_PLL1, "pll1", NULL, 0, 624000000},
+	{PXA168_CLK_PLL2, "pll2", NULL, 0, 797000000},
 	{PXA168_CLK_USB_PLL, "usb_pll", NULL, 0, 480000000},
 };
 
@@ -229,6 +230,9 @@ static DEFINE_SPINLOCK(ccic0_lock);
 static const char * const ccic_parent_names[] = {"pll1_4", "pll1_8"};
 static const char * const ccic_phy_parent_names[] = {"pll1_6", "pll1_12"};
 
+static DEFINE_SPINLOCK(gc300_lock);
+static const char * const gc300_parent_names[] = {"pll1_4", "pll1_2", "pll2", "pll1"};
+
 static struct mmp_param_mux_clk apmu_mux_clks[] = {
 	{0, "dfc_mux", dfc_parent_names, ARRAY_SIZE(dfc_parent_names), CLK_SET_RATE_PARENT, APMU_DFC, 6, 1, 0, &dfc_lock},
 	{0, "sdh0_mux", sdh_parent_names, ARRAY_SIZE(sdh_parent_names), CLK_SET_RATE_PARENT, APMU_SDH0, 6, 2, 0, &sdh0_lock},
@@ -238,6 +242,7 @@ static struct mmp_param_mux_clk apmu_mux_clks[] = {
 	{0, "disp0_mux", disp_parent_names, ARRAY_SIZE(disp_parent_names), CLK_SET_RATE_PARENT, APMU_DISP0, 6, 1, 0, &disp0_lock},
 	{0, "ccic0_mux", ccic_parent_names, ARRAY_SIZE(ccic_parent_names), CLK_SET_RATE_PARENT, APMU_CCIC0, 6, 1, 0, &ccic0_lock},
 	{0, "ccic0_phy_mux", ccic_phy_parent_names, ARRAY_SIZE(ccic_phy_parent_names), CLK_SET_RATE_PARENT, APMU_CCIC0, 7, 1, 0, &ccic0_lock},
+	{0, "gc300_mux", gc300_parent_names, ARRAY_SIZE(gc300_parent_names), CLK_SET_RATE_PARENT, APMU_GC, 6, 2, 0, &gc300_lock},
 };
 
 static struct mmp_param_div_clk apmu_div_clks[] = {
@@ -259,6 +264,8 @@ static struct mmp_param_gate_clk apmu_gate_clks[] = {
 	{PXA168_CLK_CCIC0, "ccic0_clk", "ccic0_mux", CLK_SET_RATE_PARENT, APMU_CCIC0, 0x1b, 0x1b, 0x0, 0, &ccic0_lock},
 	{PXA168_CLK_CCIC0_PHY, "ccic0_phy_clk", "ccic0_phy_mux", CLK_SET_RATE_PARENT, APMU_CCIC0, 0x24, 0x24, 0x0, 0, &ccic0_lock},
 	{PXA168_CLK_CCIC0_SPHY, "ccic0_sphy_clk", "ccic0_sphy_div", CLK_SET_RATE_PARENT, APMU_CCIC0, 0x300, 0x300, 0x0, 0, &ccic0_lock},
+	/* This is a dummy clock. The GC300 is picky about powerup; u-boot handles it. */
+	{PXA168_CLK_GC_CORE, "gc300_clk", "gc300_mux", CLK_SET_RATE_PARENT, APMU_GC, 0x0, 0x0, 0x0, 0, &gc300_lock},
 };
 
 static void pxa168_axi_periph_clk_init(struct pxa168_clk_unit *pxa_unit)
