@@ -6,6 +6,7 @@
 #define ARMADA_CRTC_H
 
 #include <drm/drm_crtc.h>
+#include <drm/drm_encoder.h>
 
 struct armada_gem_object;
 
@@ -35,6 +36,7 @@ struct armada_variant;
 
 struct armada_crtc {
 	struct drm_crtc		crtc;
+	struct drm_encoder		encoder;
 	const struct armada_variant *variant;
 	void			*variant_data;
 	unsigned		num;
