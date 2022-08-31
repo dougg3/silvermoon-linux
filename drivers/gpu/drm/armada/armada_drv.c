@@ -264,13 +264,6 @@ static int armada_drm_probe(struct platform_device *pdev)
 
 			drm_of_component_match_add(dev, &match, component_compare_of, np);
 		}
-
-		for_each_compatible_node(np, NULL, "marvell,armada-lcdc") {
-			if (!of_device_is_available(np))
-				continue;
-
-			armada_add_endpoints(dev, &match, np);
-		}
 	}
 
 	return component_master_add_with_match(&pdev->dev, &armada_master_ops,
