@@ -924,6 +924,32 @@ static const struct panel_desc armadeus_st0700_adapt = {
 	.bus_flags = DRM_BUS_FLAG_DE_HIGH | DRM_BUS_FLAG_PIXDATA_SAMPLE_NEGEDGE,
 };
 
+static const struct drm_display_mode auo_a080sn01_r8_chumby_mode = {
+	.clock = 39000,
+	.hdisplay = 800,
+	.hsync_start = 800 + 40,
+	.hsync_end = 800 + 40 + 112,
+	.htotal = 800 + 40 + 112 + 88,
+	.vdisplay = 600,
+	.vsync_start = 600 + 1,
+	.vsync_end = 600 + 1 + 3,
+	.vtotal = 600 + 1 + 3 + 21,
+	.flags = DRM_MODE_FLAG_NHSYNC | DRM_MODE_FLAG_NVSYNC,
+};
+
+static const struct panel_desc auo_a080sn01_r8_chumby = {
+	.modes = &auo_a080sn01_r8_chumby_mode,
+	.num_modes = 1,
+	.bpc = 8,
+	.size = {
+		.width = 162,
+		.height = 122,
+	},
+	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
+	.bus_flags = DRM_BUS_FLAG_DE_HIGH | DRM_BUS_FLAG_PIXDATA_SAMPLE_POSEDGE,
+	.connector_type = DRM_MODE_CONNECTOR_DPI,
+};
+
 static const struct drm_display_mode auo_b101aw03_mode = {
 	.clock = 51450,
 	.hdisplay = 1024,
@@ -4208,6 +4234,9 @@ static const struct of_device_id platform_of_match[] = {
 	}, {
 		.compatible = "armadeus,st0700-adapt",
 		.data = &armadeus_st0700_adapt,
+	}, {
+		.compatible = "auo,a080sn01-r8-chumby",
+		.data = &auo_a080sn01_r8_chumby,
 	}, {
 		.compatible = "auo,b101aw03",
 		.data = &auo_b101aw03,
