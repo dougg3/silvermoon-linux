@@ -917,6 +917,7 @@ static int armada_drm_crtc_create(struct drm_device *drm, struct device *dev,
 	struct drm_bridge *bridge;
 	void __iomem *base;
 	int ret;
+	const char *str;
 
 	base = devm_ioremap_resource(dev, res);
 	if (IS_ERR(base))
@@ -957,7 +958,54 @@ static int armada_drm_crtc_create(struct drm_device *drm, struct device *dev,
 	dcrtc->base = base;
 	dcrtc->num = drm->mode_config.num_crtc;
 	dcrtc->cfg_dumb_ctrl = DUMB24_RGB888_0;
-	dcrtc->spu_iopad_ctrl = CFG_VSCALE_LN_EN | CFG_IOPAD_DUMB24;
+	dcrtc->spu_iopad_ctrl = CFG_IOPAD_DUMB24;
+	if (dev->of_node && !of_property_read_string(dev->of_node, "output-format", &str)) {
+		if (!strcmp(str, "rgb565_15:0"))
+			dcrtc->cfg_dumb_ctrl = DUMB16_RGB565_0;
+		else if (!strcmp(str, "rgb565_23:8"))
+			dcrtc->cfg_dumb_ctrl = DUMB16_RGB565_1;
+		else if (!strcmp(str, "rgb666_17:0"))
+			dcrtc->cfg_dumb_ctrl = DUMB18_RGB666_0;
+		else if (!strcmp(str, "rgb666_23:6"))
+			dcrtc->cfg_dumb_ctrl = DUMB18_RGB666_1;
+		else if (!strcmp(str, "rgb444_11:0"))
+			dcrtc->cfg_dumb_ctrl = DUMB12_RGB444_0;
+		else if (!strcmp(str, "rgb444_23:12"))
+			dcrtc->cfg_dumb_ctrl = DUMB12_RGB444_1;
+		else if (!strcmp(str, "rgb888"))
+			dcrtc->cfg_dumb_ctrl = DUMB24_RGB888_0;
+		else {
+			DRM_ERROR("invalid output-format specified\n");
+			ret = -EINVAL;
+			goto err_crtc;
+		}
+	}
+	if (dev->of_node && !of_property_read_string(dev->of_node, "io-pin-allocation", &str)) {
+		if (!strcmp(str, "dumb_24"))
+			dcrtc->spu_iopad_ctrl = CFG_IOPAD_DUMB24;
+		else if (!strcmp(str, "dumb_18_spi"))
+			dcrtc->spu_iopad_ctrl = CFG_IOPAD_DUMB18SPI;
+		else if (!strcmp(str, "dumb_18_gpio"))
+			dcrtc->spu_iopad_ctrl = CFG_IOPAD_DUMB18GPIO;
+		else if (!strcmp(str, "dumb_16_spi"))
+			dcrtc->spu_iopad_ctrl = CFG_IOPAD_DUMB16SPI;
+		else if (!strcmp(str, "dumb_16_gpio"))
+			dcrtc->spu_iopad_ctrl = CFG_IOPAD_DUMB16GPIO;
+		else if (!strcmp(str, "dumb_12"))
+			dcrtc->spu_iopad_ctrl = CFG_IOPAD_DUMB12GPIO;
+		else if (!strcmp(str, "smart_18_spi"))
+			dcrtc->spu_iopad_ctrl = CFG_IOPAD_SMART18;
+		else if (!strcmp(str, "smart_16_spi"))
+			dcrtc->spu_iopad_ctrl = CFG_IOPAD_SMART16;
+		else if (!strcmp(str, "smart_8"))
+			dcrtc->spu_iopad_ctrl = CFG_IOPAD_SMART8;
+		else {
+			DRM_ERROR("invalid io-pin-allocation specified\n");
+			ret = -EINVAL;
+			goto err_crtc;
+		}
+	}
+	dcrtc->spu_iopad_ctrl |= CFG_VSCALE_LN_EN;
 	spin_lock_init(&dcrtc->irq_lock);
 	dcrtc->irq_ena = CLEAN_SPU_IRQ_ISR;
 
