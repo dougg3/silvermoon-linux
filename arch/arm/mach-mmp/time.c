@@ -43,16 +43,18 @@
 static void __iomem *mmp_timer_base = TIMERS_VIRT_BASE;
 
 /*
- * FIXME: the timer needs some delay to stablize the counter capture
+ * Reads the timer through the CVWR register. Delay is required after
+ * requesting a read. We can't directly read the CR register due to
+ * metastability issues documented in the datasheet.
  */
 static inline uint32_t timer_read(void)
 {
-	int delay = 100;
+	int delay = 3;
 
 	__raw_writel(1, mmp_timer_base + TMR_CVWR(1));
 
 	while (delay--)
-		cpu_relax();
+		__raw_readl(mmp_timer_base + TMR_CVWR(1));
 
 	return __raw_readl(mmp_timer_base + TMR_CVWR(1));
 }
