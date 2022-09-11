@@ -918,6 +918,8 @@ static int armada_drm_crtc_create(struct drm_device *drm, struct device *dev,
 	void __iomem *base;
 	int ret;
 	const char *str;
+	bool preserve_startup_fb = false;
+	u32 tmp;
 
 	base = devm_ioremap_resource(dev, res);
 	if (IS_ERR(base))
@@ -1009,15 +1011,21 @@ static int armada_drm_crtc_create(struct drm_device *drm, struct device *dev,
 	spin_lock_init(&dcrtc->irq_lock);
 	dcrtc->irq_ena = CLEAN_SPU_IRQ_ISR;
 
+	if (dev->of_node && of_get_property(dev->of_node, "preserve-startup-fb", NULL))
+		preserve_startup_fb = true;
+
 	/* Initialize some registers which we don't otherwise set */
-	writel_relaxed(0x00000001, dcrtc->base + LCD_CFG_SCLK_DIV);
+	if (!preserve_startup_fb)
+		writel_relaxed(0x00000001, dcrtc->base + LCD_CFG_SCLK_DIV);
 	writel_relaxed(0x00000000, dcrtc->base + LCD_SPU_BLANKCOLOR);
 	writel_relaxed(dcrtc->spu_iopad_ctrl,
 		       dcrtc->base + LCD_SPU_IOPAD_CONTROL);
 	writel_relaxed(0x00000000, dcrtc->base + LCD_SPU_SRAM_PARA0);
-	writel_relaxed(CFG_PDWN256x32 | CFG_PDWN256x24 | CFG_PDWN256x8 |
-		       CFG_PDWN32x32 | CFG_PDWN16x66 | CFG_PDWN32x66 |
-		       CFG_PDWN64x66, dcrtc->base + LCD_SPU_SRAM_PARA1);
+	tmp = CFG_PDWN256x32 | CFG_PDWN256x24 | CFG_PDWN256x8 |
+	      CFG_PDWN32x32 | CFG_PDWN16x66 | CFG_PDWN32x66;
+	if (!preserve_startup_fb)
+		tmp |= CFG_PDWN64x66;
+	writel_relaxed(tmp, dcrtc->base + LCD_SPU_SRAM_PARA1);
 	writel_relaxed(0x2032ff81, dcrtc->base + LCD_SPU_DMA_CTRL1);
 	writel_relaxed(dcrtc->irq_ena, dcrtc->base + LCD_SPU_IRQ_ENA);
 	readl_relaxed(dcrtc->base + LCD_SPU_IRQ_ISR);
