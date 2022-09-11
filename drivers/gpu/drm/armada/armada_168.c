@@ -17,6 +17,7 @@ struct armada168_variant_data {
 	struct clk *clks[4];
 	struct clk *sel_clk;
 	struct clk *periph_clk;
+	bool inhibit_next_periph_clk_enable;
 };
 
 static int armada168_crtc_init(struct armada_crtc *dcrtc, struct device *dev)
@@ -59,6 +60,15 @@ static int armada168_crtc_init(struct armada_crtc *dcrtc, struct device *dev)
 			else
 				v->periph_clk = clk;
 		}
+
+		/* If we have a peripheral clock and we're trying to preserve the startup
+		 * framebuffer, enable the clock now and inhibit the next enable */
+		if (v->periph_clk &&
+		    of_get_property(dev->of_node, "preserve-startup-fb", NULL)) {
+			clk_prepare_enable(v->periph_clk);
+			v->inhibit_next_periph_clk_enable = true;
+		}
+
 	} else {
 		clk = devm_clk_get(dev, "ext_ref_clk1");
 		if (IS_ERR(clk))
@@ -149,8 +159,12 @@ static void armada168_crtc_enable(struct armada_crtc *dcrtc,
 			dcrtc->clk = v->sel_clk;
 	}
 
-	if (v->periph_clk)
+	/* Enable the peripheral clock for the LCD as well.
+	 * Note that we may have already enabled it, so inhibit if necessary */
+	if (v->periph_clk && !v->inhibit_next_periph_clk_enable)
 		clk_prepare_enable(v->periph_clk);
+	else
+		v->inhibit_next_periph_clk_enable = false;
 }
 
 const struct armada_variant armada168_ops = {
