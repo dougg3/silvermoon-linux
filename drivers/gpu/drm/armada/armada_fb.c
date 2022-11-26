@@ -20,9 +20,10 @@ static const struct drm_framebuffer_funcs armada_fb_funcs = {
 struct armada_framebuffer *armada_framebuffer_create(struct drm_device *dev,
 	const struct drm_mode_fb_cmd2 *mode, struct armada_gem_object *obj)
 {
+	const struct drm_format_info *info = drm_get_format_info(dev, mode);
 	struct armada_framebuffer *dfb;
 	uint8_t format, config;
-	int ret;
+	int ret, i;
 
 	switch (mode->pixel_format) {
 #define FMT(drm, fmt, mod)		\
@@ -62,7 +63,8 @@ struct armada_framebuffer *armada_framebuffer_create(struct drm_device *dev,
 
 	dfb->fmt = format;
 	dfb->mod = config;
-	dfb->fb.obj[0] = &obj->obj;
+	for (i = 0; i < info->num_planes; i++)
+		dfb->fb.obj[i] = &obj->obj;
 
 	drm_helper_mode_fill_fb_struct(dev, &dfb->fb, mode);
 
@@ -78,7 +80,8 @@ struct armada_framebuffer *armada_framebuffer_create(struct drm_device *dev,
 	 * the above call, but the caller will drop their reference
 	 * to it.  Hence we need to take our own reference.
 	 */
-	drm_gem_object_get(&obj->obj);
+	for (i = 0; i < info->num_planes; i++)
+		drm_gem_object_get(&obj->obj);
 
 	return dfb;
 }
