@@ -432,10 +432,9 @@ static int lbs_add_wpa_tlv(u8 *tlv, const u8 *ie, u8 ie_len)
 	*tlv++ = 0;
 	tlv_len = *tlv++ = *ie++;
 	*tlv++ = 0;
-	while (tlv_len--)
-		*tlv++ = *ie++;
-	/* the TLV is two bytes larger than the IE */
-	return ie_len + 2;
+	memcpy(tlv, ie, tlv_len);
+	/* the TLV has a four-byte header */
+	return tlv_len + 4;
 }
 
 /*
