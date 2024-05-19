@@ -115,9 +115,9 @@ static int chumby8_reboot_probe(struct platform_device *pdev)
 	int ret;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	c8_poweroff.base = devm_ioremap_resource(dev, res);
-	if (IS_ERR(c8_poweroff.base))
-		return PTR_ERR(c8_poweroff.base);
+	c8_poweroff.base = ioremap(res->start, resource_size(res));
+	if (!c8_poweroff.base)
+		return -ENOMEM;
 
 	c8_poweroff.clk = devm_clk_get(dev, NULL);
 	if (IS_ERR(c8_poweroff.clk))
